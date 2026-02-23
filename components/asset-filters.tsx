@@ -115,7 +115,7 @@ export function AssetFilters({
           <label className="text-sm font-medium mb-1.5 block">Search</label>
           <Input
             name="search"
-            placeholder="Search by filename or title..."
+            placeholder="Search by name, title, filepath or description..."
             defaultValue={search}
           />
         </div>
