@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { MultiSelectWithCreate } from "@/components/multi-select-with-create";
 import { updateSession } from "@/lib/actions";
+import { toDateInputValue } from "@/lib/utils";
 import type { Session, Event, Topic, Category, Location } from "@/lib/db/schema";
 
 interface EditSessionFormProps {
@@ -34,6 +35,9 @@ export function EditSessionForm({
 }: EditSessionFormProps) {
   const [selectedTopicIds, setSelectedTopicIds] = useState<string[]>(initialTopicIds);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>(initialCategoryIds);
+
+  // Controlled state for date field
+  const [sessionDate, setSessionDate] = useState(toDateInputValue(session.sessionDate));
 
   return (
     <div className="space-y-6">
@@ -86,7 +90,8 @@ export function EditSessionForm({
                 id="sessionDate"
                 name="sessionDate"
                 type="date"
-                defaultValue={session.sessionDate || ""}
+                value={sessionDate}
+                onChange={(e) => setSessionDate(e.target.value)}
               />
             </div>
 

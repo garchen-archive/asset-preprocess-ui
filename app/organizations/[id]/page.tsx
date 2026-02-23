@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteOrganization } from "@/lib/actions";
-import { formatDateRange } from "@/lib/utils";
+import { formatDateRange, getDateMeta } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +68,7 @@ export default async function OrganizationDetailPage({
       eventDateStart: events.eventDateStart,
       eventDateEnd: events.eventDateEnd,
       catalogingStatus: events.catalogingStatus,
+      additionalMetadata: events.additionalMetadata,
       role: sql<string>`
         CASE
           WHEN ${events.hostOrganizationId} = ${params.id} THEN 'Host'
@@ -262,7 +263,7 @@ export default async function OrganizationDetailPage({
                           </td>
                           <td className="px-4 py-3 text-sm">{event.eventType || "—"}</td>
                           <td className="px-4 py-3 text-sm">
-                            {formatDateRange(event.eventDateStart, event.eventDateEnd)}
+                            {formatDateRange(event.eventDateStart, event.eventDateEnd, getDateMeta(event.additionalMetadata))}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <Badge

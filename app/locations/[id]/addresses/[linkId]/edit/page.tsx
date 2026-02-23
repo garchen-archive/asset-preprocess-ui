@@ -2,6 +2,7 @@ import { db } from "@/lib/db/client";
 import { locations, addresses, locationAddresses } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { updateAddressAndLink } from "@/lib/actions";
+import { toDateInputValue } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -145,7 +146,7 @@ export default async function EditLocationAddressPage({
                 id="effectiveFrom"
                 name="effectiveFrom"
                 type="date"
-                defaultValue={link.effectiveFrom || ""}
+                defaultValue={toDateInputValue(link.effectiveFrom)}
               />
             </div>
             <div>
@@ -154,7 +155,7 @@ export default async function EditLocationAddressPage({
                 id="effectiveTo"
                 name="effectiveTo"
                 type="date"
-                defaultValue={link.effectiveTo || ""}
+                defaultValue={toDateInputValue(link.effectiveTo)}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 Leave blank if this is the current address
