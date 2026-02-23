@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteEvent } from "@/lib/actions";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getDateMeta, type DateMeta } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +39,9 @@ export default async function EventDetailPage({
   if (!event) {
     notFound();
   }
+
+  // Extract date metadata for display
+  const dateMeta = getDateMeta(event.additionalMetadata);
 
   // Get sessions in this event
   const eventSessions = await db
@@ -225,11 +228,15 @@ export default async function EventDetailPage({
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Start Date</dt>
-                <dd className="text-sm mt-1">{formatDate(event.eventDateStart)}</dd>
+                <dd className="text-sm mt-1">
+                  {formatDate(event.eventDateStart, dateMeta?.startPrecision || "day", dateMeta?.qualifier || "exact")}
+                </dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">End Date</dt>
-                <dd className="text-sm mt-1">{formatDate(event.eventDateEnd)}</dd>
+                <dd className="text-sm mt-1">
+                  {formatDate(event.eventDateEnd, dateMeta?.endPrecision || "day", dateMeta?.qualifier || "exact")}
+                </dd>
               </div>
             </dl>
           </div>
@@ -689,37 +696,54 @@ export default async function EventDetailPage({
           )}
 
           {/* Sheet Import Metadata */}
-          {event.additionalMetadata && Object.keys(event.additionalMetadata).length > 0 && (
-            <div className="rounded-lg border p-6">
-              <h2 className="text-xl font-semibold mb-4">Sheet Import Metadata</h2>
-              <div className="rounded-md border">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Field</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.entries(event.additionalMetadata)
-                      .sort(([a], [b]) => a.localeCompare(b))
-                      .map(([key, value]) => (
-                        <tr key={key} className="border-b hover:bg-muted/50">
-                          <td className="px-3 py-2 text-xs font-mono text-muted-foreground whitespace-nowrap">
-                            {key}
-                          </td>
-                          <td className="px-3 py-2 text-xs break-all whitespace-pre-wrap">
-                            {typeof value === "object"
-                              ? JSON.stringify(value, null, 2)
-                              : renderTextWithLinks(String(value ?? ""))}
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+          {(() => {
+            // Handle both namespaced (sheetImport) and flat (legacy) metadata formats
+            const metadata = event.additionalMetadata as Record<string, unknown> | null;
+            if (!metadata || Object.keys(metadata).length === 0) return null;
+
+            // Check if metadata is namespaced (has sheetImport key)
+            const sheetImportData = metadata.sheetImport as Record<string, unknown> | undefined;
+
+            // Use sheetImport if available, otherwise use all metadata except dateMeta
+            const displayData = sheetImportData ||
+              Object.fromEntries(
+                Object.entries(metadata).filter(([key]) => key !== "dateMeta")
+              );
+
+            if (Object.keys(displayData).length === 0) return null;
+
+            return (
+              <div className="rounded-lg border p-6">
+                <h2 className="text-xl font-semibold mb-4">Raw Import Metadata</h2>
+                <div className="rounded-md border">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Field</th>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(displayData)
+                        .sort(([a], [b]) => a.localeCompare(b))
+                        .map(([key, value]) => (
+                          <tr key={key} className="border-b hover:bg-muted/50">
+                            <td className="px-3 py-2 text-xs font-mono text-muted-foreground whitespace-nowrap">
+                              {key}
+                            </td>
+                            <td className="px-3 py-2 text-xs break-all whitespace-pre-wrap">
+                              {typeof value === "object"
+                                ? JSON.stringify(value, null, 2)
+                                : renderTextWithLinks(String(value ?? ""))}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Danger Zone */}
           <div className="rounded-lg border border-destructive/50 p-6">

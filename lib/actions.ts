@@ -5,6 +5,7 @@ import { archiveAssets, events, sessions, topics, categories, eventTopics, event
 import { eq, sql, inArray, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { dateCertaintyToMeta, type DateCertainty } from "@/lib/utils";
 
 function parseCoord(value: string | null): number | null {
   if (!value) return null;
@@ -108,6 +109,50 @@ export async function createEvent(prevState: { error: string } | undefined, form
   const topicIds = formData.getAll("topicIds") as string[];
   const categoryIds = formData.getAll("categoryIds") as string[];
 
+  // Extract date certainty from form and convert to precision + qualifier
+  const startCertainty = (formData.get("startCertainty") as DateCertainty) || "exact";
+  const endCertainty = (formData.get("endCertainty") as DateCertainty) || "exact";
+
+  const startMeta = dateCertaintyToMeta(startCertainty);
+  const endMeta = dateCertaintyToMeta(endCertainty);
+
+  // Only store non-default values in dateMeta
+  const dateMeta: Record<string, string> = {};
+  if (startMeta.precision !== "day") {
+    dateMeta.startPrecision = startMeta.precision;
+  }
+  if (endMeta.precision !== "day") {
+    dateMeta.endPrecision = endMeta.precision;
+  }
+  // Use start qualifier as the primary (they should usually match)
+  if (startMeta.qualifier !== "exact") {
+    dateMeta.qualifier = startMeta.qualifier;
+  }
+
+  // Parse custom metadata from form (sent as JSON string)
+  const customMetadataStr = formData.get("customMetadata") as string;
+  let customMetadata: Record<string, unknown> | undefined;
+  if (customMetadataStr) {
+    try {
+      const parsed = JSON.parse(customMetadataStr);
+      if (typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+        customMetadata = parsed;
+      }
+    } catch {
+      // Ignore invalid JSON
+    }
+  }
+
+  // Build additionalMetadata with dateMeta and custom if present
+  const additionalMetadata: Record<string, unknown> = {};
+  if (Object.keys(dateMeta).length > 0) {
+    additionalMetadata.dateMeta = dateMeta;
+  }
+  if (customMetadata) {
+    additionalMetadata.custom = customMetadata;
+  }
+  const finalMetadata = Object.keys(additionalMetadata).length > 0 ? additionalMetadata : null;
+
   const data = {
     eventName: formData.get("eventName") as string,
     parentEventId: parentEventIdStr && parentEventIdStr !== "" ? parentEventIdStr : null,
@@ -123,6 +168,7 @@ export async function createEvent(prevState: { error: string } | undefined, form
     catalogingStatus: formData.get("catalogingStatus") as string || null,
     notes: formData.get("notes") as string || null,
     createdBy: formData.get("createdBy") as string || null,
+    additionalMetadata: finalMetadata,
   };
 
   try {
@@ -168,15 +214,63 @@ export async function createEvent(prevState: { error: string } | undefined, form
 }
 
 export async function updateEvent(id: string, formData: FormData) {
-  // Parse additional metadata JSON
-  let additionalMetadata = null;
-  const additionalMetadataStr = formData.get("additionalMetadata") as string;
-  if (additionalMetadataStr && additionalMetadataStr.trim()) {
+  // Get existing event to preserve additionalMetadata
+  const [existingEvent] = await db
+    .select({ additionalMetadata: events.additionalMetadata })
+    .from(events)
+    .where(eq(events.id, id))
+    .limit(1);
+
+  // Build additionalMetadata by merging existing with new dateMeta
+  const existingMetadata = (existingEvent?.additionalMetadata as Record<string, unknown>) || {};
+
+  // Extract date certainty from form and convert to precision + qualifier
+  const startCertainty = (formData.get("startCertainty") as DateCertainty) || "exact";
+  const endCertainty = (formData.get("endCertainty") as DateCertainty) || "exact";
+
+  const startMeta = dateCertaintyToMeta(startCertainty);
+  const endMeta = dateCertaintyToMeta(endCertainty);
+
+  // Only store non-default values in dateMeta
+  const dateMeta: Record<string, string> = {};
+  if (startMeta.precision !== "day") {
+    dateMeta.startPrecision = startMeta.precision;
+  }
+  if (endMeta.precision !== "day") {
+    dateMeta.endPrecision = endMeta.precision;
+  }
+  // Use start qualifier as the primary (they should usually match)
+  if (startMeta.qualifier !== "exact") {
+    dateMeta.qualifier = startMeta.qualifier;
+  }
+
+  // Parse custom metadata from form (sent as JSON string)
+  const customMetadataStr = formData.get("customMetadata") as string;
+  let customMetadata: Record<string, unknown> | undefined;
+  if (customMetadataStr) {
     try {
-      additionalMetadata = JSON.parse(additionalMetadataStr);
-    } catch (e) {
-      console.error("Invalid JSON in additionalMetadata:", e);
+      const parsed = JSON.parse(customMetadataStr);
+      if (typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+        customMetadata = parsed;
+      }
+    } catch {
+      // Ignore invalid JSON
     }
+  }
+
+  // Merge dateMeta and custom into existing metadata (preserve sheetImport)
+  const additionalMetadata: Record<string, unknown> = {
+    ...existingMetadata,
+    dateMeta: Object.keys(dateMeta).length > 0 ? dateMeta : undefined,
+    custom: customMetadata,
+  };
+
+  // Clean up: remove empty keys
+  if (!additionalMetadata.dateMeta) {
+    delete additionalMetadata.dateMeta;
+  }
+  if (!additionalMetadata.custom) {
+    delete additionalMetadata.custom;
   }
 
   const parentEventIdStr = formData.get("parentEventId") as string;
@@ -203,7 +297,7 @@ export async function updateEvent(id: string, formData: FormData) {
     eventDescription: formData.get("eventDescription") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
     notes: formData.get("notes") as string || null,
-    additionalMetadata,
+    additionalMetadata: Object.keys(additionalMetadata).length > 0 ? additionalMetadata : null,
     updatedAt: new Date(),
   };
 

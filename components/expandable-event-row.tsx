@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { Event } from "@/lib/db/schema";
-import { formatDate, formatDateRange } from "@/lib/utils";
+import { formatDate, formatDateRange, getDateMeta } from "@/lib/utils";
 
 interface Session {
   id: string;
@@ -152,7 +152,7 @@ export function ExpandableEventRow({
         )}
         {visibleColumns.dateRange && (
           <td className="px-4 py-3 text-sm">
-            {formatDateRange(event.eventDateStart, event.eventDateEnd)}
+            {formatDateRange(event.eventDateStart, event.eventDateEnd, getDateMeta(event.additionalMetadata))}
           </td>
         )}
         {visibleColumns.topic && (

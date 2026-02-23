@@ -10,7 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { MultiSelectWithCreate } from "@/components/multi-select-with-create";
 import { VenueSelect, type VenueWithDetails } from "@/components/venue-select";
 import { OrgSelect } from "@/components/org-select";
+import { MetadataEditor } from "@/components/metadata-editor";
 import { createEvent } from "@/lib/actions";
+import { DATE_CERTAINTY_OPTIONS, type DateCertainty } from "@/lib/utils";
 import type { Event, Topic, Category, Organization } from "@/lib/db/schema";
 
 interface NewEventFormProps {
@@ -36,6 +38,13 @@ export function NewEventForm({ eventsList, parentEventId, parentEvent, allTopics
   const [venueId, setVenueId] = useState("");
   const [showVenuePicker, setShowVenuePicker] = useState(false);
   const [showSpaceOverride, setShowSpaceOverride] = useState(false);
+
+  // Date certainty state (combined precision + qualifier)
+  const [startCertainty, setStartCertainty] = useState<DateCertainty>("exact");
+  const [endCertainty, setEndCertainty] = useState<DateCertainty>("exact");
+
+  // Custom metadata state
+  const [customMetadata, setCustomMetadata] = useState<Record<string, unknown>>({});
 
   // Get the selected venue details
   const selectedVenue = allVenues.find((v) => v.id === venueId);
@@ -150,12 +159,36 @@ export function NewEventForm({ eventsList, parentEventId, parentEvent, allTopics
 
             <div>
               <Label htmlFor="eventDateStart">Start Date</Label>
-              <Input id="eventDateStart" name="eventDateStart" type="date" />
+              <div className="flex gap-2">
+                <Input id="eventDateStart" name="eventDateStart" type="date" className="flex-1" />
+                <select
+                  value={startCertainty}
+                  onChange={(e) => setStartCertainty(e.target.value as DateCertainty)}
+                  className="w-44 rounded-md border border-input bg-background px-2 py-2 text-xs"
+                >
+                  {DATE_CERTAINTY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <input type="hidden" name="startCertainty" value={startCertainty} />
             </div>
 
             <div>
               <Label htmlFor="eventDateEnd">End Date</Label>
-              <Input id="eventDateEnd" name="eventDateEnd" type="date" />
+              <div className="flex gap-2">
+                <Input id="eventDateEnd" name="eventDateEnd" type="date" className="flex-1" />
+                <select
+                  value={endCertainty}
+                  onChange={(e) => setEndCertainty(e.target.value as DateCertainty)}
+                  className="w-44 rounded-md border border-input bg-background px-2 py-2 text-xs"
+                >
+                  {DATE_CERTAINTY_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <input type="hidden" name="endCertainty" value={endCertainty} />
             </div>
 
             <div className="md:col-span-2">
@@ -434,6 +467,14 @@ export function NewEventForm({ eventsList, parentEventId, parentEvent, allTopics
               />
             </div>
           </div>
+        </div>
+
+        {/* Custom Metadata */}
+        <div className="space-y-4 rounded-lg border p-4">
+          <MetadataEditor
+            customMetadata={customMetadata}
+            onCustomMetadataChange={setCustomMetadata}
+          />
         </div>
 
         {/* Action Buttons */}

@@ -122,6 +122,7 @@ export const events = pgTable("events", {
   eventDateStart: date("event_date_start", { mode: "string" }),
   eventDateEnd: date("event_date_end", { mode: "string" }),
   eventType: text("event_type"),
+  eventFormat: text("event_format"), // single_recording, series, retreat, collection
   parentEventId: uuid("parent_event_id").references((): any => events.id, { onDelete: "set null" }), // Self-referential
   locationId: uuid("location_id").references(() => locations.id, { onDelete: "set null" }),
   organizerOrganizationId: uuid("organizer_organization_id").references(() => organizations.id, { onDelete: "set null" }),
