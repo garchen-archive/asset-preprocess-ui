@@ -90,6 +90,7 @@ export default async function AssetsPage({
       or(
         ilike(archiveAssets.name, `%${search}%`),
         ilike(archiveAssets.title, `%${search}%`),
+        ilike(archiveAssets.descriptionSummary, `%${search}%`),
         ilike(archiveAssets.filepath, `%${search}%`)
       )
     );
