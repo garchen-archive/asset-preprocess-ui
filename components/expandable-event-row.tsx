@@ -22,6 +22,7 @@ interface ChildEvent {
 interface VisibleColumns {
   eventName: boolean;
   type: boolean;
+  format: boolean;
   dateRange: boolean;
   topic: boolean;
   category: boolean;
@@ -49,6 +50,7 @@ interface ExpandableEventRowProps {
 const defaultVisibleColumns: VisibleColumns = {
   eventName: true,
   type: true,
+  format: false,
   dateRange: true,
   topic: false,
   category: false,
@@ -57,6 +59,13 @@ const defaultVisibleColumns: VisibleColumns = {
   sessions: true,
   assets: true,
   status: true,
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+  single_recording: "Single Recording",
+  series: "Series",
+  retreat: "Retreat",
+  collection: "Collection",
 };
 
 export function ExpandableEventRow({
@@ -149,6 +158,15 @@ export function ExpandableEventRow({
         )}
         {visibleColumns.type && (
           <td className="px-4 py-3 text-sm">{event.eventType || "—"}</td>
+        )}
+        {visibleColumns.format && (
+          <td className="px-4 py-3 text-sm">
+            {event.eventFormat ? (
+              <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-700">
+                {FORMAT_LABELS[event.eventFormat] || event.eventFormat}
+              </span>
+            ) : "—"}
+          </td>
         )}
         {visibleColumns.dateRange && (
           <td className="px-4 py-3 text-sm">

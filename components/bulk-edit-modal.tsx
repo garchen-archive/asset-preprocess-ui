@@ -33,6 +33,14 @@ const QUALITY_RATING_OPTIONS = [
   { value: "unusable", label: "Unusable" },
 ];
 
+const ASSET_TYPE_OPTIONS = [
+  { value: "video", label: "Video" },
+  { value: "audio", label: "Audio" },
+  { value: "image", label: "Image" },
+  { value: "document", label: "Document" },
+  { value: "subtitle", label: "Subtitle" },
+];
+
 const TRANSCRIPT_LANGUAGE_OPTIONS = [
   "EN", "ZH", "Tibetan", "German", "Vietnamese", "French", "Spanish", "Portuguese", "Other"
 ];
@@ -68,6 +76,7 @@ export function BulkEditModal({
   const [backedUpLocally, setBackedUpLocally] = useState(false);
   const [audioQuality, setAudioQuality] = useState("high");
   const [videoQuality, setVideoQuality] = useState("high");
+  const [assetType, setAssetType] = useState("video");
 
   const toggleField = (field: string) => {
     setEnabledFields((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -103,6 +112,7 @@ export function BulkEditModal({
       if (enabledFields.backedUpLocally) updates.backedUpLocally = backedUpLocally;
       if (enabledFields.audioQuality) updates.audioQuality = audioQuality;
       if (enabledFields.videoQuality) updates.videoQuality = videoQuality;
+      if (enabledFields.assetType) updates.assetType = assetType;
 
       if (Object.keys(updates).length === 0) {
         setError("Please select at least one field to update");
@@ -166,6 +176,28 @@ export function BulkEditModal({
             <div className="text-sm text-blue-800">
               <strong>Tip:</strong> Check the box next to each field you want to update. Only checked fields will be modified.
             </div>
+          </div>
+
+          {/* Classification Section */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Classification</h3>
+
+            <FieldRow
+              label="Asset Type"
+              enabled={enabledFields.assetType}
+              onToggle={() => toggleField("assetType")}
+            >
+              <select
+                value={assetType}
+                onChange={(e) => setAssetType(e.target.value)}
+                disabled={!enabledFields.assetType}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {ASSET_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </FieldRow>
           </div>
 
           {/* Interpreter Section */}

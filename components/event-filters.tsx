@@ -12,6 +12,7 @@ interface EventFiltersProps {
   viewFilter: string;
   statusFilter: string;
   typeFilter: string;
+  formatFilter: string;
   sourceFilter: string;
   organizerFilter: string;
   hostingCenterFilter: string;
@@ -37,6 +38,7 @@ export function EventFilters({
   viewFilter,
   statusFilter,
   typeFilter,
+  formatFilter,
   sourceFilter,
   organizerFilter,
   hostingCenterFilter,
@@ -74,6 +76,7 @@ export function EventFilters({
     viewFilter !== "all" ||
     statusFilter ||
     typeFilter ||
+    formatFilter ||
     sourceFilter ||
     organizerFilter ||
     hostingCenterFilter ||
@@ -89,7 +92,7 @@ export function EventFilters({
   return (
     <form className="rounded-lg border p-3" method="GET">
       {/* Primary filters - always visible */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
         <div className="col-span-2">
           <label className="text-xs font-medium mb-1 block">Search</label>
           <Input
@@ -150,6 +153,21 @@ export function EventFilters({
                 {t.type}
               </option>
             ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-medium mb-1 block">Format</label>
+          <select
+            name="format"
+            defaultValue={formatFilter}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
+          >
+            <option value="">All</option>
+            <option value="single_recording">Single Recording</option>
+            <option value="series">Series</option>
+            <option value="retreat">Retreat</option>
+            <option value="collection">Collection</option>
           </select>
         </div>
 

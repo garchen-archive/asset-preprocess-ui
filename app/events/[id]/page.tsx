@@ -227,6 +227,20 @@ export default async function EventDetailPage({
                 <dd className="text-sm mt-1">{event.eventType || "—"}</dd>
               </div>
               <div>
+                <dt className="text-sm font-medium text-muted-foreground">Event Format</dt>
+                <dd className="text-sm mt-1">
+                  {event.eventFormat ? (
+                    <Badge variant="outline" className="text-xs">
+                      {event.eventFormat === "single_recording" ? "Single Recording" :
+                       event.eventFormat === "series" ? "Series" :
+                       event.eventFormat === "retreat" ? "Retreat" :
+                       event.eventFormat === "collection" ? "Collection" :
+                       event.eventFormat}
+                    </Badge>
+                  ) : "—"}
+                </dd>
+              </div>
+              <div>
                 <dt className="text-sm font-medium text-muted-foreground">Start Date</dt>
                 <dd className="text-sm mt-1">
                   {formatDate(event.eventDateStart, dateMeta?.startPrecision || "day", dateMeta?.qualifier || "exact")}

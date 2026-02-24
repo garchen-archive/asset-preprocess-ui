@@ -177,6 +177,9 @@ export function EditEventForm({
                 <option value="retreat">Retreat</option>
                 <option value="collection">Collection</option>
               </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Structure of this event&apos;s recordings
+              </p>
             </div>
 
             <div>

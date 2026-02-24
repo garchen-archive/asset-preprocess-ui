@@ -20,6 +20,14 @@ const CATALOGING_STATUS_OPTIONS = [
   { value: "Needs Review", label: "Needs Review" },
 ];
 
+const EVENT_FORMAT_OPTIONS = [
+  { value: "", label: "— None —" },
+  { value: "single_recording", label: "Single Recording" },
+  { value: "series", label: "Series" },
+  { value: "retreat", label: "Retreat" },
+  { value: "collection", label: "Collection" },
+];
+
 export function EventsBulkEditModal({
   selectedEventIds,
   organizations,
@@ -37,6 +45,7 @@ export function EventsBulkEditModal({
   const [hostOrganizationId, setHostOrganizationId] = useState("");
   const [organizerOrganizationId, setOrganizerOrganizationId] = useState("");
   const [eventType, setEventType] = useState("");
+  const [eventFormat, setEventFormat] = useState("");
   const [catalogingStatus, setCatalogingStatus] = useState("Not Started");
 
   const toggleField = (field: string) => {
@@ -53,6 +62,7 @@ export function EventsBulkEditModal({
       if (enabledFields.hostOrganizationId) updates.hostOrganizationId = hostOrganizationId || null;
       if (enabledFields.organizerOrganizationId) updates.organizerOrganizationId = organizerOrganizationId || null;
       if (enabledFields.eventType) updates.eventType = eventType || null;
+      if (enabledFields.eventFormat) updates.eventFormat = eventFormat || null;
       if (enabledFields.catalogingStatus) updates.catalogingStatus = catalogingStatus || null;
 
       if (Object.keys(updates).length === 0) {
@@ -172,6 +182,23 @@ export function EventsBulkEditModal({
                 <option value="">— None —</option>
                 {availableTypes.map((t) => (
                   <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </FieldRow>
+
+            <FieldRow
+              label="Event Format"
+              enabled={enabledFields.eventFormat}
+              onToggle={() => toggleField("eventFormat")}
+            >
+              <select
+                value={eventFormat}
+                onChange={(e) => setEventFormat(e.target.value)}
+                disabled={!enabledFields.eventFormat}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {EVENT_FORMAT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </FieldRow>

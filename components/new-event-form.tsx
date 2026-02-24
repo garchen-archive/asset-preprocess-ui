@@ -158,6 +158,24 @@ export function NewEventForm({ eventsList, parentEventId, parentEvent, allTopics
             </div>
 
             <div>
+              <Label htmlFor="eventFormat">Event Format</Label>
+              <select
+                id="eventFormat"
+                name="eventFormat"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="">Select format...</option>
+                <option value="single_recording">Single Recording</option>
+                <option value="series">Series</option>
+                <option value="retreat">Retreat</option>
+                <option value="collection">Collection</option>
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Structure of this event&apos;s recordings
+              </p>
+            </div>
+
+            <div>
               <Label htmlFor="eventDateStart">Start Date</Label>
               <div className="flex gap-2">
                 <Input id="eventDateStart" name="eventDateStart" type="date" className="flex-1" />
