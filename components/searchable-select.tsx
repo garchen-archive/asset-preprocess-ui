@@ -14,6 +14,7 @@ interface SearchableSelectProps {
   name?: string;
   placeholder?: string;
   disabled?: boolean;
+  emptyLabel?: string;
 }
 
 export function SearchableSelect({
@@ -23,6 +24,7 @@ export function SearchableSelect({
   name,
   placeholder = "Search...",
   disabled = false,
+  emptyLabel = "All",
 }: SearchableSelectProps) {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -84,7 +86,7 @@ export function SearchableSelect({
             className="px-2 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm"
             onClick={() => handleSelect("")}
           >
-            <span className="text-muted-foreground">All</span>
+            <span className="text-muted-foreground">{emptyLabel}</span>
           </div>
           {filteredOptions.length === 0 ? (
             <div className="px-2 py-1.5 text-sm text-muted-foreground">

@@ -21,6 +21,7 @@ type EventRow = {
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: "eventName", label: "Event Name", visible: true },
   { key: "type", label: "Type", visible: true },
+  { key: "format", label: "Format", visible: false },
   { key: "dateRange", label: "Date Range", visible: true },
   { key: "childEvents", label: "Child Events", visible: true },
   { key: "sessions", label: "Sessions", visible: true },
@@ -179,6 +180,9 @@ export function EventsPageClient({
               {isColumnVisible("type") && (
                 <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
               )}
+              {isColumnVisible("format") && (
+                <th className="px-4 py-3 text-left text-sm font-medium">Format</th>
+              )}
               {isColumnVisible("dateRange") && (
                 <SortableHeader column="eventDateStart">Date Range</SortableHeader>
               )}
@@ -223,6 +227,7 @@ export function EventsPageClient({
                 visibleColumns={{
                   eventName: isColumnVisible("eventName"),
                   type: isColumnVisible("type"),
+                  format: isColumnVisible("format"),
                   dateRange: isColumnVisible("dateRange"),
                   topic: isColumnVisible("topic"),
                   category: isColumnVisible("category"),

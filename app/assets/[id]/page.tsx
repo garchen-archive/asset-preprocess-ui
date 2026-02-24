@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { archiveAssets, sessions, events } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { archiveAssets, sessions, events, transcripts } from "@/lib/db/schema";
+import { eq, isNull, and } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
@@ -45,6 +45,17 @@ export default async function AssetDetailPage({
 
   // Use direct event if available, otherwise use event from session
   const event = directEvent || sessionEvent;
+
+  // Fetch transcripts linked to this asset (as media asset or canonical asset)
+  const linkedTranscripts = await db
+    .select()
+    .from(transcripts)
+    .where(
+      and(
+        isNull(transcripts.deletedAt),
+        eq(transcripts.mediaAssetId, params.id)
+      )
+    );
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -280,6 +291,71 @@ export default async function AssetDetailPage({
                 </dd>
               </div>
             </dl>
+          </div>
+
+          {/* Linked Transcript Records */}
+          <div className="rounded-lg border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Transcript Records</h2>
+              <Button size="sm" variant="outline" asChild>
+                <Link href={`/transcripts/new?mediaAssetId=${params.id}`}>
+                  Add Transcript
+                </Link>
+              </Button>
+            </div>
+            {linkedTranscripts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No transcript records linked to this asset.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {linkedTranscripts.map((tr) => (
+                  <div
+                    key={tr.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <Link
+                          href={`/transcripts/${tr.id}`}
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          {tr.language.toUpperCase()} {tr.kind}
+                        </Link>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              tr.status === "published"
+                                ? "bg-purple-100 text-purple-700"
+                                : tr.status === "approved"
+                                ? "bg-green-100 text-green-700"
+                                : tr.status === "reviewed"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {tr.status}
+                          </span>
+                          {tr.timecodeStatus && tr.timecodeStatus !== "none" && (
+                            <span className="text-xs text-muted-foreground">
+                              Timecode: {tr.timecodeStatus}
+                            </span>
+                          )}
+                          {tr.source && (
+                            <span className="text-xs text-muted-foreground capitalize">
+                              ({tr.source})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      v{tr.version}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Processing Section */}

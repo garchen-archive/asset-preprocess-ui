@@ -16,6 +16,7 @@ export default async function EventsPage({
     search?: string;
     status?: string;
     type?: string;
+    format?: string;
     view?: string;
     source?: string;
     organizer?: string;
@@ -36,6 +37,7 @@ export default async function EventsPage({
   const search = searchParams.search || "";
   const statusFilter = searchParams.status || "";
   const typeFilter = searchParams.type || "";
+  const formatFilter = searchParams.format || "";
   const viewFilter = searchParams.view || "all"; // Default to all events
   const sourceFilter = searchParams.source || "";
   const organizerFilter = searchParams.organizer || "";
@@ -77,6 +79,10 @@ export default async function EventsPage({
 
   if (typeFilter) {
     conditions.push(eq(events.eventType, typeFilter));
+  }
+
+  if (formatFilter) {
+    conditions.push(eq(events.eventFormat, formatFilter));
   }
 
   if (sourceFilter) {
@@ -300,6 +306,7 @@ export default async function EventsPage({
         viewFilter={viewFilter}
         statusFilter={statusFilter}
         typeFilter={typeFilter}
+        formatFilter={formatFilter}
         sourceFilter={sourceFilter}
         organizerFilter={organizerFilter}
         hostingCenterFilter={hostingCenterFilter}
@@ -346,6 +353,7 @@ export default async function EventsPage({
           ...(viewFilter !== "all" && { view: viewFilter }),
           ...(statusFilter && { status: statusFilter }),
           ...(typeFilter && { type: typeFilter }),
+          ...(formatFilter && { format: formatFilter }),
           ...(sourceFilter && { source: sourceFilter }),
           ...(organizerFilter && { organizer: organizerFilter }),
           ...(hostingCenterFilter && { hostingCenter: hostingCenterFilter }),

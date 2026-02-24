@@ -415,3 +415,118 @@ export const venues = pgTable("venues", {
 
 export type Venue = typeof venues.$inferSelect;
 export type NewVenue = typeof venues.$inferInsert;
+
+// ============================================================================
+// TRANSCRIPTS
+// Structured transcript metadata and workflow, separate from file layer.
+// Links a media asset (video/audio) to its transcript file(s).
+// ============================================================================
+
+export const transcripts = pgTable("transcripts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // References to archive_assets
+  // mediaAssetId: The video/audio asset this transcript is for
+  // canonicalAssetId: The subtitle/document asset containing the transcript text
+  mediaAssetId: uuid("media_asset_id").notNull().references(() => archiveAssets.id, { onDelete: "cascade" }),
+  canonicalAssetId: uuid("canonical_asset_id").references(() => archiveAssets.id, { onDelete: "set null" }),
+
+  // Language & Type
+  language: text("language").notNull(),                      // bo, en, zh, es, de, vi, fr, pt, multi
+  kind: text("kind").notNull().default("transcript"),        // transcript, translation
+  spokenSource: text("spoken_source"),                       // teacher, interpreter, mixed, unknown
+  spokenLanguage: text("spoken_language"),                   // bo, en, multi, unknown
+  translationOf: text("translation_of"),                     // teacher, interpreter, mixed, unknown (when kind=translation)
+
+  // Timecode & Source
+  timecodeStatus: text("timecode_status").default("none"),   // none, partial, full
+  source: text("source"),                                    // asr, human, hybrid
+
+  // Workflow
+  status: text("status").notNull().default("draft"),         // draft, reviewed, approved, published
+  version: integer("version").notNull().default(1),
+
+  // Attribution
+  createdBy: text("created_by"),
+  editedBy: text("edited_by"),
+
+  // System
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type Transcript = typeof transcripts.$inferSelect;
+export type NewTranscript = typeof transcripts.$inferInsert;
+
+// ============================================================================
+// TRANSCRIPT_REVISIONS
+// Immutable revision history for Transcript records.
+// - Preserves full edit history
+// - Allows rollback to prior transcript versions
+// - Maintains archival audit trail
+// - Records are append-only
+// ============================================================================
+
+export const transcriptRevisions = pgTable("transcript_revisions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // References
+  transcriptId: uuid("transcript_id").notNull().references(() => transcripts.id, { onDelete: "cascade" }),
+  canonicalAssetId: uuid("canonical_asset_id").references(() => archiveAssets.id, { onDelete: "set null" }),
+
+  // Version tracking
+  versionNumber: integer("version_number").notNull(),
+
+  // Attribution
+  editedBy: text("edited_by"),
+  editedAt: timestamp("edited_at").defaultNow().notNull(),
+
+  // Context
+  changeNote: text("change_note"),
+  statusSnapshot: text("status_snapshot"),                   // workflow status at time of revision
+
+  // System (append-only, no updatedAt)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type TranscriptRevision = typeof transcriptRevisions.$inferSelect;
+export type NewTranscriptRevision = typeof transcriptRevisions.$inferInsert;
+
+// ============================================================================
+// EVENT_ITEMS
+// Ordered membership of assets within events.
+// Links events to their constituent media assets with sequencing and metadata.
+// ============================================================================
+
+export const eventItems = pgTable("event_items", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // References
+  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  archiveAssetId: uuid("archive_asset_id").notNull().references(() => archiveAssets.id, { onDelete: "cascade" }),
+  anchorMediaAssetId: uuid("anchor_media_asset_id").references(() => archiveAssets.id, { onDelete: "set null" }),
+
+  // Ordering
+  sequence: integer("sequence").notNull().default(0),
+
+  // Classification
+  relationshipType: text("relationship_type").default("primary_recording"), // primary_recording, derivative, supporting_materials, reference
+
+  // Descriptive
+  label: text("label"),                              // Display label for this item
+  occurrenceDate: date("occurrence_date", { mode: "string" }), // Date this specific item occurred
+  dayLabel: text("day_label"),                       // "Day 1", "Morning Session", etc.
+  isContinuation: boolean("is_continuation").default(false), // Is this a continuation of previous item
+
+  // System
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type EventItem = typeof eventItems.$inferSelect;
+export type NewEventItem = typeof eventItems.$inferInsert;

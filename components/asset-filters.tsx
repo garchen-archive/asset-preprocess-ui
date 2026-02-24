@@ -25,6 +25,7 @@ interface AssetFiltersProps {
   hasTimestampedTranscriptFilter: string;
   transcriptsAvailableFilter: string;
   needsDetailedReviewFilter: string;
+  hasTranscriptRecordFilter: string;
   dateSearchFilter: string;
   dateFromFilter: string;
   dateToFilter: string;
@@ -68,6 +69,7 @@ export function AssetFilters({
   hasTimestampedTranscriptFilter,
   transcriptsAvailableFilter,
   needsDetailedReviewFilter,
+  hasTranscriptRecordFilter,
   dateSearchFilter,
   dateFromFilter,
   dateToFilter,
@@ -78,7 +80,8 @@ export function AssetFilters({
   const transcriptFilterCount =
     selectedTranscriptLangs.length +
     (hasTimestampedTranscriptFilter ? 1 : 0) +
-    (transcriptsAvailableFilter ? 1 : 0);
+    (transcriptsAvailableFilter ? 1 : 0) +
+    (hasTranscriptRecordFilter ? 1 : 0);
   // excludeFilter defaults to "false" (Included), so only count as active filter if explicitly set to something else
   const fileFilterCount =
     selectedFormats.length +
@@ -103,6 +106,7 @@ export function AssetFilters({
     hasTimestampedTranscriptFilter ||
     transcriptsAvailableFilter ||
     needsDetailedReviewFilter ||
+    hasTranscriptRecordFilter ||
     dateSearchFilter ||
     dateFromFilter ||
     dateToFilter;
@@ -130,6 +134,9 @@ export function AssetFilters({
             <option value="">All Types</option>
             <option value="video">Video</option>
             <option value="audio">Audio</option>
+            <option value="image">Image</option>
+            <option value="document">Document</option>
+            <option value="subtitle">Subtitle</option>
           </select>
         </div>
 
@@ -220,9 +227,21 @@ export function AssetFilters({
         badge={transcriptFilterCount}
         defaultOpen={transcriptFilterCount > 0}
       >
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Available</label>
+            <label className="text-sm font-medium mb-1.5 block">Has Transcript Record</label>
+            <select
+              name="hasTranscriptRecord"
+              defaultValue={hasTranscriptRecordFilter}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">All</option>
+              <option value="true">Yes</option>
+              <option value="false">No</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1.5 block">Available (Legacy)</label>
             <select
               name="transcriptsAvailable"
               defaultValue={transcriptsAvailableFilter}
@@ -234,7 +253,7 @@ export function AssetFilters({
             </select>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1.5 block">Timestamped</label>
+            <label className="text-sm font-medium mb-1.5 block">Timestamped (Legacy)</label>
             <select
               name="hasTimestampedTranscript"
               defaultValue={hasTimestampedTranscriptFilter}
@@ -248,7 +267,7 @@ export function AssetFilters({
           </div>
           <FilterMultiSelect
             name="transcriptLangs"
-            label="Languages"
+            label="Languages (Legacy)"
             options={TRANSCRIPT_LANGUAGE_OPTIONS}
             selectedValues={selectedTranscriptLangs}
             placeholder="Select languages..."
