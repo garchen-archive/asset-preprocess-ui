@@ -9,7 +9,6 @@ interface Session {
   id: string;
   sessionName: string;
   sessionDate: string | null;
-  sequenceInEvent: number | null;
 }
 
 interface ChildEvent {
@@ -22,6 +21,7 @@ interface ChildEvent {
 interface VisibleColumns {
   eventName: boolean;
   type: boolean;
+  format: boolean;
   dateRange: boolean;
   topic: boolean;
   category: boolean;
@@ -40,6 +40,8 @@ interface ExpandableEventRowProps {
   childEventCount: number;
   sessionCount: number;
   assetCount: number;
+  topicNames: string | null;
+  categoryNames: string | null;
   index: number;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -49,6 +51,7 @@ interface ExpandableEventRowProps {
 const defaultVisibleColumns: VisibleColumns = {
   eventName: true,
   type: true,
+  format: false,
   dateRange: true,
   topic: false,
   category: false,
@@ -59,6 +62,13 @@ const defaultVisibleColumns: VisibleColumns = {
   status: true,
 };
 
+const FORMAT_LABELS: Record<string, string> = {
+  single_recording: "Single Recording",
+  series: "Series",
+  retreat: "Retreat",
+  collection: "Collection",
+};
+
 export function ExpandableEventRow({
   event,
   parentEventName,
@@ -67,6 +77,8 @@ export function ExpandableEventRow({
   childEventCount,
   sessionCount,
   assetCount,
+  topicNames,
+  categoryNames,
   index,
   isSelected,
   onToggleSelect,
@@ -150,16 +162,25 @@ export function ExpandableEventRow({
         {visibleColumns.type && (
           <td className="px-4 py-3 text-sm">{event.eventType || "—"}</td>
         )}
+        {visibleColumns.format && (
+          <td className="px-4 py-3 text-sm">
+            {event.eventFormat ? (
+              <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-indigo-100 text-indigo-700">
+                {FORMAT_LABELS[event.eventFormat] || event.eventFormat}
+              </span>
+            ) : "—"}
+          </td>
+        )}
         {visibleColumns.dateRange && (
           <td className="px-4 py-3 text-sm">
             {formatDateRange(event.eventDateStart, event.eventDateEnd, getDateMeta(event.additionalMetadata))}
           </td>
         )}
         {visibleColumns.topic && (
-          <td className="px-4 py-3 text-sm">{event.topic || "—"}</td>
+          <td className="px-4 py-3 text-sm">{topicNames || "—"}</td>
         )}
         {visibleColumns.category && (
-          <td className="px-4 py-3 text-sm">{event.category || "—"}</td>
+          <td className="px-4 py-3 text-sm">{categoryNames || "—"}</td>
         )}
         {visibleColumns.hostOrg && (
           <td className="px-4 py-3 text-sm">{hostOrgName || "—"}</td>
@@ -278,11 +299,6 @@ export function ExpandableEventRow({
                             href={`/sessions/${session.id}`}
                             className="text-blue-600 hover:underline inline-flex items-center gap-2"
                           >
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {session.sequenceInEvent
-                                ? `#${session.sequenceInEvent}`
-                                : "—"}
-                            </span>
                             <span>{session.sessionName}</span>
                             {session.sessionDate && (
                               <span className="text-xs text-muted-foreground">

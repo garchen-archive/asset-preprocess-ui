@@ -126,16 +126,6 @@ export function EditSessionForm({
             </div>
 
             <div>
-              <Label htmlFor="sequenceInEvent">Sequence in Event</Label>
-              <Input
-                id="sequenceInEvent"
-                name="sequenceInEvent"
-                type="number"
-                defaultValue={session.sequenceInEvent || ""}
-              />
-            </div>
-
-            <div>
               <Label htmlFor="durationEstimated">Duration (Estimated)</Label>
               <Input
                 id="durationEstimated"

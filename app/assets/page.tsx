@@ -25,6 +25,7 @@ export default async function AssetsPage({
     hasTimestampedTranscript?: string;
     transcriptsAvailable?: string;
     needsDetailedReview?: string;
+    hasTranscriptRecord?: string;
     dateSearch?: string;
     dateFrom?: string;
     dateTo?: string;
@@ -72,6 +73,7 @@ export default async function AssetsPage({
   const hasTimestampedTranscriptFilter = searchParams.hasTimestampedTranscript || "";
   const transcriptsAvailableFilter = searchParams.transcriptsAvailable || "";
   const needsDetailedReviewFilter = searchParams.needsDetailedReview || "";
+  const hasTranscriptRecordFilter = searchParams.hasTranscriptRecord || "";
   const dateSearchFilter = searchParams.dateSearch || "";
   const dateFromFilter = searchParams.dateFrom || "";
   const dateToFilter = searchParams.dateTo || "";
@@ -207,6 +209,19 @@ export default async function AssetsPage({
     }
   }
 
+  // Has transcript record filter (checks existence in transcript table)
+  if (hasTranscriptRecordFilter) {
+    if (hasTranscriptRecordFilter === "true") {
+      conditions.push(
+        sql`EXISTS (SELECT 1 FROM transcript t WHERE t.media_asset_id = ${archiveAssets.id} AND t.deleted_at IS NULL)`
+      );
+    } else if (hasTranscriptRecordFilter === "false") {
+      conditions.push(
+        sql`NOT EXISTS (SELECT 1 FROM transcript t WHERE t.media_asset_id = ${archiveAssets.id} AND t.deleted_at IS NULL)`
+      );
+    }
+  }
+
   // Date search filter - LIKE search on createdDate or originalDate
   if (dateSearchFilter) {
     conditions.push(
@@ -294,7 +309,7 @@ export default async function AssetsPage({
     });
 
   // Get statistics for counters (only when no filters applied - excludeFilter must be empty/"All")
-  const showStats = !search && !statusFilter && !typeFilter && !sourceFilter && !isMediaFileFilter && !safeToDeleteFilter && excludeFilter === "" && selectedFormats.length === 0 && !hasOralTranslationFilter && selectedInterpreterLangs.length === 0 && selectedTranscriptLangs.length === 0 && !hasTimestampedTranscriptFilter && !transcriptsAvailableFilter && !needsDetailedReviewFilter && !dateSearchFilter && !dateFromFilter && !dateToFilter;
+  const showStats = !search && !statusFilter && !typeFilter && !sourceFilter && !isMediaFileFilter && !safeToDeleteFilter && excludeFilter === "" && selectedFormats.length === 0 && !hasOralTranslationFilter && selectedInterpreterLangs.length === 0 && selectedTranscriptLangs.length === 0 && !hasTimestampedTranscriptFilter && !transcriptsAvailableFilter && !needsDetailedReviewFilter && !hasTranscriptRecordFilter && !dateSearchFilter && !dateFromFilter && !dateToFilter;
   let stats = null;
 
   if (showStats) {
@@ -327,6 +342,21 @@ export default async function AssetsPage({
       .from(archiveAssets)
       .where(eq(archiveAssets.assetType, "audio"));
 
+    const [imageCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.assetType, "image"));
+
+    const [documentCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.assetType, "document"));
+
+    const [subtitleCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.assetType, "subtitle"));
+
     stats = {
       total: totalCount.count,
       ready: readyCount.count,
@@ -334,6 +364,9 @@ export default async function AssetsPage({
       notStarted: notStartedCount.count,
       video: videoCount.count,
       audio: audioCount.count,
+      image: imageCount.count,
+      document: documentCount.count,
+      subtitle: subtitleCount.count,
     };
   }
 
@@ -350,35 +383,56 @@ export default async function AssetsPage({
 
       {/* Statistics Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="rounded-lg border p-4">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">Total Assets</div>
+        <div className="space-y-4">
+          {/* Workflow Status */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <div className="text-sm text-muted-foreground">Total Assets</div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-green-600">{stats.ready}</div>
+              <div className="text-sm text-muted-foreground">Ready</div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-yellow-600">{stats.inProgress}</div>
+              <div className="text-sm text-muted-foreground">In Progress</div>
+            </div>
+
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-gray-600">{stats.notStarted}</div>
+              <div className="text-sm text-muted-foreground">Not Started</div>
+            </div>
           </div>
 
-          <div className="rounded-lg border p-4">
-            <div className="text-2xl font-bold text-green-600">{stats.ready}</div>
-            <div className="text-sm text-muted-foreground">Ready</div>
-          </div>
+          {/* Asset Types */}
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-4">
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-blue-600">{stats.video}</div>
+              <div className="text-sm text-muted-foreground">Videos</div>
+            </div>
 
-          <div className="rounded-lg border p-4">
-            <div className="text-2xl font-bold text-yellow-600">{stats.inProgress}</div>
-            <div className="text-sm text-muted-foreground">In Progress</div>
-          </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-purple-600">{stats.audio}</div>
+              <div className="text-sm text-muted-foreground">Audio</div>
+            </div>
 
-          <div className="rounded-lg border p-4">
-            <div className="text-2xl font-bold text-gray-600">{stats.notStarted}</div>
-            <div className="text-sm text-muted-foreground">Not Started</div>
-          </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-pink-600">{stats.image}</div>
+              <div className="text-sm text-muted-foreground">Images</div>
+            </div>
 
-          <div className="rounded-lg border p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.video}</div>
-            <div className="text-sm text-muted-foreground">Videos</div>
-          </div>
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-orange-600">{stats.document}</div>
+              <div className="text-sm text-muted-foreground">Documents</div>
+            </div>
 
-          <div className="rounded-lg border p-4">
-            <div className="text-2xl font-bold text-purple-600">{stats.audio}</div>
-            <div className="text-sm text-muted-foreground">Audio</div>
+            <div className="rounded-lg border p-4">
+              <div className="text-2xl font-bold text-teal-600">{stats.subtitle}</div>
+              <div className="text-sm text-muted-foreground">Subtitles</div>
+            </div>
           </div>
         </div>
       )}
@@ -401,6 +455,7 @@ export default async function AssetsPage({
         hasTimestampedTranscriptFilter={hasTimestampedTranscriptFilter}
         transcriptsAvailableFilter={transcriptsAvailableFilter}
         needsDetailedReviewFilter={needsDetailedReviewFilter}
+        hasTranscriptRecordFilter={hasTranscriptRecordFilter}
         dateSearchFilter={dateSearchFilter}
         dateFromFilter={dateFromFilter}
         dateToFilter={dateToFilter}
@@ -435,6 +490,7 @@ export default async function AssetsPage({
           ...(hasTimestampedTranscriptFilter && { hasTimestampedTranscript: hasTimestampedTranscriptFilter }),
           ...(transcriptsAvailableFilter && { transcriptsAvailable: transcriptsAvailableFilter }),
           ...(needsDetailedReviewFilter && { needsDetailedReview: needsDetailedReviewFilter }),
+          ...(hasTranscriptRecordFilter && { hasTranscriptRecord: hasTranscriptRecordFilter }),
           ...(dateSearchFilter && { dateSearch: dateSearchFilter }),
           ...(dateFromFilter && { dateFrom: dateFromFilter }),
           ...(dateToFilter && { dateTo: dateToFilter }),
@@ -461,6 +517,7 @@ export default async function AssetsPage({
           ...(hasTimestampedTranscriptFilter && { hasTimestampedTranscript: hasTimestampedTranscriptFilter }),
           ...(transcriptsAvailableFilter && { transcriptsAvailable: transcriptsAvailableFilter }),
           ...(needsDetailedReviewFilter && { needsDetailedReview: needsDetailedReviewFilter }),
+          ...(hasTranscriptRecordFilter && { hasTranscriptRecord: hasTranscriptRecordFilter }),
           ...(dateSearchFilter && { dateSearch: dateSearchFilter }),
           ...(dateFromFilter && { dateFrom: dateFromFilter }),
           ...(dateToFilter && { dateTo: dateToFilter }),

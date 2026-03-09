@@ -10,6 +10,7 @@ interface FilterMultiSelectProps {
   options: { value: string; label: string }[];
   selectedValues: string[];
   placeholder?: string;
+  compact?: boolean;
 }
 
 export function FilterMultiSelect({
@@ -18,10 +19,16 @@ export function FilterMultiSelect({
   options,
   selectedValues,
   placeholder = "Select...",
+  compact = false,
 }: FilterMultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>(selectedValues);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync internal state with prop changes (e.g., when filters are cleared)
+  useEffect(() => {
+    setSelected(selectedValues);
+  }, [selectedValues]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -49,7 +56,7 @@ export function FilterMultiSelect({
 
   return (
     <div className="space-y-1.5" ref={dropdownRef}>
-      <label className="text-sm font-medium">{label}</label>
+      <label className={`font-medium block ${compact ? "text-xs mb-1" : "text-sm"}`}>{label}</label>
 
       {/* Dropdown trigger */}
       <div className="relative">

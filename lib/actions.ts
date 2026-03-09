@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db/client";
-import { archiveAssets, events, sessions, topics, categories, eventTopics, eventCategories, sessionTopics, sessionCategories, locations, addresses, locationAddresses, organizations, organizationLocations, venues } from "@/lib/db/schema";
+import { archiveAssets, events, sessions, topics, categories, eventTopics, eventCategories, sessionTopics, sessionCategories, locations, addresses, locationAddresses, organizations, organizationLocations, venues, transcripts, transcriptRevisions } from "@/lib/db/schema";
 import { eq, sql, inArray, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -61,7 +61,7 @@ export async function updateAsset(id: string, formData: FormData) {
 
     // Administrative - Event or Session assignment (mutually exclusive)
     eventId: formData.get("eventId") as string || null,
-    sessionId: formData.get("sessionId") as string || null,
+    eventSessionId: formData.get("eventSessionId") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
     catalogedBy: formData.get("catalogedBy") as string || null,
     backedUpLocally: formData.get("backedUpLocally") === "on",
@@ -164,6 +164,7 @@ export async function createEvent(prevState: { error: string } | undefined, form
     eventDateStart: formData.get("eventDateStart") as string || null,
     eventDateEnd: formData.get("eventDateEnd") as string || null,
     eventType: formData.get("eventType") as string || null,
+    eventFormat: formData.get("eventFormat") as string || null,
     eventDescription: formData.get("eventDescription") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
     notes: formData.get("notes") as string || null,
@@ -294,6 +295,7 @@ export async function updateEvent(id: string, formData: FormData) {
     eventDateStart: formData.get("eventDateStart") as string || null,
     eventDateEnd: formData.get("eventDateEnd") as string || null,
     eventType: formData.get("eventType") as string || null,
+    eventFormat: formData.get("eventFormat") as string || null,
     eventDescription: formData.get("eventDescription") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
     notes: formData.get("notes") as string || null,
@@ -364,7 +366,6 @@ export async function createSession(formData: FormData) {
     sessionTime: formData.get("sessionTime") as string || null,
     sessionStartTime: formData.get("sessionStartTime") as string || null,
     sessionEndTime: formData.get("sessionEndTime") as string || null,
-    sequenceInEvent: formData.get("sequenceInEvent") ? parseInt(formData.get("sequenceInEvent") as string) : null,
     sessionDescription: formData.get("sessionDescription") as string || null,
     durationEstimated: formData.get("durationEstimated") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
@@ -377,7 +378,7 @@ export async function createSession(formData: FormData) {
   if (topicIds.length > 0) {
     await db.insert(sessionTopics).values(
       topicIds.map(topicId => ({
-        sessionId: newSession.id,
+        eventSessionId: newSession.id,
         topicId: topicId,
       }))
     );
@@ -387,7 +388,7 @@ export async function createSession(formData: FormData) {
   if (categoryIds.length > 0) {
     await db.insert(sessionCategories).values(
       categoryIds.map(categoryId => ({
-        sessionId: newSession.id,
+        eventSessionId: newSession.id,
         categoryId: categoryId,
       }))
     );
@@ -420,7 +421,6 @@ export async function updateSession(id: string, formData: FormData) {
     sessionTime: formData.get("sessionTime") as string || null,
     sessionStartTime: formData.get("sessionStartTime") as string || null,
     sessionEndTime: formData.get("sessionEndTime") as string || null,
-    sequenceInEvent: formData.get("sequenceInEvent") ? parseInt(formData.get("sequenceInEvent") as string) : null,
     sessionDescription: formData.get("sessionDescription") as string || null,
     durationEstimated: formData.get("durationEstimated") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
@@ -432,14 +432,14 @@ export async function updateSession(id: string, formData: FormData) {
   await db.update(sessions).set(data).where(eq(sessions.id, id));
 
   // Delete existing junction table entries
-  await db.delete(sessionTopics).where(eq(sessionTopics.sessionId, id));
-  await db.delete(sessionCategories).where(eq(sessionCategories.sessionId, id));
+  await db.delete(sessionTopics).where(eq(sessionTopics.eventSessionId, id));
+  await db.delete(sessionCategories).where(eq(sessionCategories.eventSessionId, id));
 
   // Create new junction table entries for topics
   if (topicIds.length > 0) {
     await db.insert(sessionTopics).values(
       topicIds.map(topicId => ({
-        sessionId: id,
+        eventSessionId: id,
         topicId: topicId,
       }))
     );
@@ -449,7 +449,7 @@ export async function updateSession(id: string, formData: FormData) {
   if (categoryIds.length > 0) {
     await db.insert(sessionCategories).values(
       categoryIds.map(categoryId => ({
-        sessionId: id,
+        eventSessionId: id,
         categoryId: categoryId,
       }))
     );
@@ -464,6 +464,45 @@ export async function deleteSession(id: string) {
 
   revalidatePath("/sessions");
   redirect("/sessions");
+}
+
+interface BulkSessionData {
+  eventId: string;
+  sessionName: string;
+  sessionDate: string | null;
+  topic: string | null;
+  category: string | null;
+}
+
+export async function bulkCreateSessions(
+  sessionsData: BulkSessionData[]
+): Promise<{ success: boolean; error?: string; count?: number }> {
+  try {
+    if (!sessionsData || sessionsData.length === 0) {
+      return { success: false, error: "No sessions to create" };
+    }
+
+    const eventId = sessionsData[0].eventId;
+
+    // Insert all sessions
+    const insertData = sessionsData.map(s => ({
+      eventId: s.eventId,
+      sessionName: s.sessionName,
+      sessionDate: s.sessionDate,
+      topic: s.topic,
+      category: s.category,
+    }));
+
+    await db.insert(sessions).values(insertData);
+
+    revalidatePath(`/events/${eventId}`);
+    revalidatePath("/sessions");
+
+    return { success: true, count: sessionsData.length };
+  } catch (error) {
+    console.error("Failed to bulk create sessions:", error);
+    return { success: false, error: "Failed to create sessions" };
+  }
 }
 
 // ============================================================================
@@ -1039,15 +1078,15 @@ export async function updateAddressAndLink(addressId: string, linkId: string, lo
 export async function bulkAssignAssets({
   assetIds,
   eventId,
-  sessionId,
+  eventSessionId,
 }: {
   assetIds: string[];
   eventId: string | null;
-  sessionId: string | null;
+  eventSessionId: string | null;
 }) {
   try {
-    // Validate that we have either eventId or sessionId, but not both
-    if ((eventId && sessionId) || (!eventId && !sessionId)) {
+    // Validate that we have either eventId or eventSessionId, but not both
+    if ((eventId && eventSessionId) || (!eventId && !eventSessionId)) {
       return { success: false, error: "Must specify either event or session, but not both" };
     }
 
@@ -1056,7 +1095,7 @@ export async function bulkAssignAssets({
       .update(archiveAssets)
       .set({
         eventId: eventId || null,
-        sessionId: sessionId || null,
+        eventSessionId: eventSessionId || null,
         updatedAt: new Date(),
       })
       .where(inArray(archiveAssets.id, assetIds));
@@ -1091,6 +1130,7 @@ export async function bulkUpdateAssets({
     backedUpLocally?: boolean | null;
     audioQuality?: string | null;
     videoQuality?: string | null;
+    assetType?: string | null;
   };
 }) {
   try {
@@ -1139,6 +1179,7 @@ export async function bulkUpdateEvents({
     organizerOrganizationId?: string | null;
     venueId?: string | null;
     eventType?: string | null;
+    eventFormat?: string | null;
     catalogingStatus?: string | null;
   };
 }) {
@@ -1432,4 +1473,164 @@ export async function importOrganizationsFromCSV(rows: CSVRow[]) {
   revalidatePath("/addresses");
 
   return { created, updated, errors };
+}
+
+// ============================================================================
+// TRANSCRIPT ACTIONS
+// ============================================================================
+
+export async function createTranscript(formData: FormData) {
+  const data = {
+    mediaAssetId: formData.get("mediaAssetId") as string,
+    canonicalAssetId: (formData.get("canonicalAssetId") as string) || null,
+    eventSessionId: (formData.get("eventSessionId") as string) || null,
+    eventSessionAssetId: (formData.get("eventSessionAssetId") as string) || null,
+    language: formData.get("language") as string,
+    kind: (formData.get("kind") as string) || "transcript",
+    spokenSource: (formData.get("spokenSource") as string) || null,
+    spokenLanguage: (formData.get("spokenLanguage") as string) || null,
+    translationOf: (formData.get("translationOf") as string) || null,
+    timecodeStatus: (formData.get("timecodeStatus") as string) || "none",
+    source: (formData.get("source") as string) || null,
+    status: (formData.get("status") as string) || "draft",
+    createdBy: (formData.get("createdBy") as string) || null,
+    notes: (formData.get("notes") as string) || null,
+  };
+
+  const [newTranscript] = await db.insert(transcripts).values(data).returning();
+
+  // Create initial revision
+  await db.insert(transcriptRevisions).values({
+    transcriptId: newTranscript.id,
+    canonicalAssetId: data.canonicalAssetId,
+    versionNumber: 1,
+    editedBy: data.createdBy,
+    changeNote: "Initial creation",
+    statusSnapshot: data.status,
+  });
+
+  revalidatePath("/transcripts");
+  redirect(`/transcripts/${newTranscript.id}`);
+}
+
+export async function updateTranscript(id: string, formData: FormData) {
+  // Get current transcript for version increment
+  const [current] = await db
+    .select()
+    .from(transcripts)
+    .where(eq(transcripts.id, id))
+    .limit(1);
+
+  if (!current) throw new Error("Transcript not found");
+
+  const newVersion = current.version + 1;
+  const editedBy = (formData.get("editedBy") as string) || null;
+  const changeNote = (formData.get("changeNote") as string) || null;
+
+  const data = {
+    canonicalAssetId: (formData.get("canonicalAssetId") as string) || null,
+    eventSessionId: (formData.get("eventSessionId") as string) || null,
+    eventSessionAssetId: (formData.get("eventSessionAssetId") as string) || null,
+    language: formData.get("language") as string,
+    kind: formData.get("kind") as string,
+    spokenSource: (formData.get("spokenSource") as string) || null,
+    spokenLanguage: (formData.get("spokenLanguage") as string) || null,
+    translationOf: (formData.get("translationOf") as string) || null,
+    timecodeStatus: (formData.get("timecodeStatus") as string) || "none",
+    source: (formData.get("source") as string) || null,
+    status: formData.get("status") as string,
+    version: newVersion,
+    editedBy,
+    notes: (formData.get("notes") as string) || null,
+    updatedAt: new Date(),
+  };
+
+  await db.update(transcripts).set(data).where(eq(transcripts.id, id));
+
+  // Create revision entry
+  await db.insert(transcriptRevisions).values({
+    transcriptId: id,
+    canonicalAssetId: data.canonicalAssetId,
+    versionNumber: newVersion,
+    editedBy,
+    changeNote,
+    statusSnapshot: data.status,
+  });
+
+  revalidatePath(`/transcripts/${id}`);
+  redirect(`/transcripts/${id}`);
+}
+
+export async function deleteTranscript(id: string) {
+  // Soft delete
+  await db
+    .update(transcripts)
+    .set({ deletedAt: new Date() })
+    .where(eq(transcripts.id, id));
+
+  revalidatePath("/transcripts");
+  redirect("/transcripts");
+}
+
+// Bulk update transcripts
+export async function bulkUpdateTranscripts({
+  transcriptIds,
+  updates,
+}: {
+  transcriptIds: string[];
+  updates: {
+    status?: string | null;
+    timecodeStatus?: string | null;
+    source?: string | null;
+    editedBy?: string | null;
+  };
+}) {
+  try {
+    if (!transcriptIds || transcriptIds.length === 0) {
+      return { success: false, error: "No transcripts selected" };
+    }
+
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+
+    for (const [key, value] of Object.entries(updates)) {
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    }
+
+    if (Object.keys(updateData).length <= 1) {
+      return { success: false, error: "No fields to update" };
+    }
+
+    await db
+      .update(transcripts)
+      .set(updateData)
+      .where(inArray(transcripts.id, transcriptIds));
+
+    revalidatePath("/transcripts");
+    return { success: true, updatedCount: transcriptIds.length };
+  } catch (error: any) {
+    console.error("Bulk update transcripts error:", error);
+    return { success: false, error: error.message || "Failed to update transcripts" };
+  }
+}
+
+// Bulk delete transcripts (soft delete)
+export async function bulkDeleteTranscripts(transcriptIds: string[]) {
+  try {
+    if (!transcriptIds || transcriptIds.length === 0) {
+      return { success: false, error: "No transcripts selected" };
+    }
+
+    await db
+      .update(transcripts)
+      .set({ deletedAt: new Date() })
+      .where(inArray(transcripts.id, transcriptIds));
+
+    revalidatePath("/transcripts");
+    return { success: true, deletedCount: transcriptIds.length };
+  } catch (error: any) {
+    console.error("Bulk delete transcripts error:", error);
+    return { success: false, error: error.message || "Failed to delete transcripts" };
+  }
 }

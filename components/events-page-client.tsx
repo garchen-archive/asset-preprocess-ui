@@ -16,11 +16,14 @@ type EventRow = {
   sessionCount: number;
   assetCount: number;
   childEventCount: number;
+  topicNames: string | null;
+  categoryNames: string | null;
 };
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: "eventName", label: "Event Name", visible: true },
   { key: "type", label: "Type", visible: true },
+  { key: "format", label: "Format", visible: false },
   { key: "dateRange", label: "Date Range", visible: true },
   { key: "childEvents", label: "Child Events", visible: true },
   { key: "sessions", label: "Sessions", visible: true },
@@ -38,7 +41,7 @@ type EventsPageClientProps = {
   offset: number;
   sortBy: string;
   sortOrder: string;
-  searchParams: Record<string, string | undefined>;
+  searchParams: Record<string, string | string[] | undefined>;
 };
 
 export function EventsPageClient({
@@ -63,7 +66,12 @@ export function EventsPageClient({
     const newSortOrder = sortBy === column && sortOrder === "asc" ? "desc" : "asc";
     const params = new URLSearchParams();
     Object.entries(searchParams).forEach(([key, value]) => {
-      if (value != null && value !== "") params.set(key, value);
+      if (value == null || value === "") return;
+      if (Array.isArray(value)) {
+        value.forEach(v => params.append(key, v));
+      } else {
+        params.set(key, value);
+      }
     });
     params.set("sortBy", column);
     params.set("sortOrder", newSortOrder);
@@ -179,6 +187,9 @@ export function EventsPageClient({
               {isColumnVisible("type") && (
                 <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
               )}
+              {isColumnVisible("format") && (
+                <th className="px-4 py-3 text-left text-sm font-medium">Format</th>
+              )}
               {isColumnVisible("dateRange") && (
                 <SortableHeader column="eventDateStart">Date Range</SortableHeader>
               )}
@@ -207,7 +218,7 @@ export function EventsPageClient({
             </tr>
           </thead>
           <tbody>
-            {eventsList.map(({ event, parentEventName, organizerName, hostOrgName, sessionCount, assetCount, childEventCount }, index) => (
+            {eventsList.map(({ event, parentEventName, organizerName, hostOrgName, sessionCount, assetCount, childEventCount, topicNames, categoryNames }, index) => (
               <ExpandableEventRow
                 key={event.id}
                 event={event}
@@ -217,12 +228,15 @@ export function EventsPageClient({
                 childEventCount={childEventCount}
                 sessionCount={sessionCount}
                 assetCount={assetCount}
+                topicNames={topicNames}
+                categoryNames={categoryNames}
                 index={index + offset}
                 isSelected={selectedEventIds.includes(event.id)}
                 onToggleSelect={() => handleToggleEvent(event.id)}
                 visibleColumns={{
                   eventName: isColumnVisible("eventName"),
                   type: isColumnVisible("type"),
+                  format: isColumnVisible("format"),
                   dateRange: isColumnVisible("dateRange"),
                   topic: isColumnVisible("topic"),
                   category: isColumnVisible("category"),

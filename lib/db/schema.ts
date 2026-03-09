@@ -1,6 +1,31 @@
 import { pgTable, uuid, text, boolean, integer, real, timestamp, date, time, jsonb } from "drizzle-orm/pg-core";
 
-export const archiveAssets = pgTable("archive_assets", {
+// ============================================================================
+// PROGRAM
+// Optional umbrella grouping above events
+// ============================================================================
+
+export const program = pgTable("program", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  programName: text("program_name").notNull(),
+  programDateStart: date("program_date_start", { mode: "string" }),
+  programDateEnd: date("program_date_end", { mode: "string" }),
+  description: text("description"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type Program = typeof program.$inferSelect;
+export type NewProgram = typeof program.$inferInsert;
+
+// ============================================================================
+// ASSET (formerly archive_assets)
+// File layer - represents physical files
+// ============================================================================
+
+export const asset = pgTable("asset", {
   // Primary key and source tracking
   id: uuid("id").defaultRandom().primaryKey(),
   metadataSource: text("metadata_source").notNull(),
@@ -52,11 +77,9 @@ export const archiveAssets = pgTable("archive_assets", {
 
   // 5. ADMINISTRATIVE
   // Optional reference to event (direct event assignment)
-  // Mutually exclusive with sessionId - asset must have EITHER eventId OR sessionId
-  eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
-  // Optional reference to session
-  // Mutually exclusive with eventId - asset must have EITHER eventId OR sessionId
-  sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "set null" }),
+  eventId: uuid("event_id").references(() => event.id, { onDelete: "set null" }),
+  // Optional reference to event_session (renamed from session_id)
+  eventSessionId: uuid("event_session_id").references(() => eventSession.id, { onDelete: "set null" }),
   catalogingStatus: text("cataloging_status"),
   catalogedBy: text("cataloged_by"),
   catalogingDate: date("cataloging_date", { mode: "string" }),
@@ -112,24 +135,34 @@ export const archiveAssets = pgTable("archive_assets", {
   additionalMetadata: jsonb("additional_metadata").$type<Record<string, any>>(),
 });
 
-export type ArchiveAsset = typeof archiveAssets.$inferSelect;
-export type NewArchiveAsset = typeof archiveAssets.$inferInsert;
+export type Asset = typeof asset.$inferSelect;
+export type NewAsset = typeof asset.$inferInsert;
 
-// Events table
-export const events = pgTable("events", {
+// Legacy aliases for backwards compatibility during migration
+export const archiveAssets = asset;
+export type ArchiveAsset = Asset;
+export type NewArchiveAsset = NewAsset;
+
+// ============================================================================
+// EVENT (formerly events)
+// Canonical content container
+// ============================================================================
+
+export const event = pgTable("event", {
   id: uuid("id").defaultRandom().primaryKey(),
+  programId: uuid("program_id").references(() => program.id, { onDelete: "set null" }),
   eventName: text("event_name").notNull(),
   eventDateStart: date("event_date_start", { mode: "string" }),
   eventDateEnd: date("event_date_end", { mode: "string" }),
   eventType: text("event_type"),
-  eventFormat: text("event_format"), // single_recording, series, retreat, collection
-  parentEventId: uuid("parent_event_id").references((): any => events.id, { onDelete: "set null" }), // Self-referential
-  locationId: uuid("location_id").references(() => locations.id, { onDelete: "set null" }),
-  organizerOrganizationId: uuid("organizer_organization_id").references(() => organizations.id, { onDelete: "set null" }),
-  hostOrganizationId: uuid("host_organization_id").references(() => organizations.id, { onDelete: "set null" }),
-  onlineHostOrganizationId: uuid("online_host_organization_id").references(() => organizations.id, { onDelete: "set null" }),
-  venueId: uuid("venue_id").references(() => venues.id, { onDelete: "set null" }),
-  venueAddressId: uuid("venue_address_id").references(() => addresses.id, { onDelete: "set null" }), // DEPRECATED: Use venueId
+  eventFormat: text("event_format"), // single, series, retreat
+  parentEventId: uuid("parent_event_id").references((): any => event.id, { onDelete: "set null" }), // Self-referential
+  locationId: uuid("location_id").references(() => location.id, { onDelete: "set null" }),
+  organizerOrganizationId: uuid("organizer_organization_id").references(() => organization.id, { onDelete: "set null" }),
+  hostOrganizationId: uuid("host_organization_id").references(() => organization.id, { onDelete: "set null" }),
+  onlineHostOrganizationId: uuid("online_host_organization_id").references(() => organization.id, { onDelete: "set null" }),
+  venueId: uuid("venue_id").references(() => venue.id, { onDelete: "set null" }),
+  venueAddressId: uuid("venue_address_id").references(() => address.id, { onDelete: "set null" }), // DEPRECATED: Use venueId
   spaceLabel: text("space_label"), // Ad-hoc room detail (e.g., "Main Hall", "Room 201")
   category: text("category"), // Comma-delimited categories
   topic: text("topic"), // Comma-delimited topics
@@ -148,23 +181,31 @@ export const events = pgTable("events", {
   additionalMetadata: jsonb("additional_metadata").$type<Record<string, any>>(),
 });
 
-export type Event = typeof events.$inferSelect;
-export type NewEvent = typeof events.$inferInsert;
+export type Event = typeof event.$inferSelect;
+export type NewEvent = typeof event.$inferInsert;
 
-// Sessions table (series layer removed - sessions now directly reference events)
-export const sessions = pgTable("sessions", {
+// Legacy alias
+export const events = event;
+
+// ============================================================================
+// EVENT_SESSION (formerly sessions)
+// Logical teaching unit within an event
+// ============================================================================
+
+export const eventSession = pgTable("event_session", {
   id: uuid("id").defaultRandom().primaryKey(),
-  eventId: uuid("event_id").references(() => events.id, { onDelete: "cascade" }), // Changed from series_id to event_id
+  eventId: uuid("event_id").references(() => event.id, { onDelete: "cascade" }),
+  canonicalEventSessionAssetId: uuid("canonical_event_session_asset_id"), // FK added after eventSessionAsset is defined
   sessionName: text("session_name").notNull(),
   sessionDate: date("session_date", { mode: "string" }),
   sessionTime: text("session_time"), // Time of day: morning, afternoon, evening, night
   sessionStartTime: time("session_start_time"),
   sessionEndTime: time("session_end_time"),
-  sequenceInEvent: integer("sequence_in_event"),
-  topic: text("topic"), // Renamed from primary_topic
+  // Note: sequenceInEvent removed - ordering belongs to collection_item
+  topic: text("topic"),
   category: text("category"),
   sessionDescription: text("session_description"),
-  venueId: uuid("venue_id").references(() => venues.id, { onDelete: "set null" }), // Optional override of event's venue
+  venueId: uuid("venue_id").references(() => venue.id, { onDelete: "set null" }), // Optional override of event's venue
   spaceLabel: text("space_label"), // Ad-hoc room detail (session-level override)
   durationEstimated: text("duration_estimated"),
   assetCount: integer("asset_count").default(0),
@@ -179,8 +220,36 @@ export const sessions = pgTable("sessions", {
   additionalMetadata: jsonb("additional_metadata").$type<Record<string, any>>(),
 });
 
-export type Session = typeof sessions.$inferSelect;
-export type NewSession = typeof sessions.$inferInsert;
+export type EventSession = typeof eventSession.$inferSelect;
+export type NewEventSession = typeof eventSession.$inferInsert;
+
+// Legacy aliases
+export const sessions = eventSession;
+export type Session = EventSession;
+export type NewSession = NewEventSession;
+
+// ============================================================================
+// EVENT_SESSION_ASSET
+// Media variants for sessions (camera angles, masters, backups, etc.)
+// ============================================================================
+
+export const eventSessionAsset = pgTable("event_session_asset", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventSessionId: uuid("event_session_id").notNull().references(() => eventSession.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => asset.id, { onDelete: "cascade" }),
+  variantType: text("variant_type").notNull(), // camera_angle, master, backup, audio_only, edited, other
+  variantLabel: text("variant_label"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type EventSessionAsset = typeof eventSessionAsset.$inferSelect;
+export type NewEventSessionAsset = typeof eventSessionAsset.$inferInsert;
+
+// ============================================================================
+// AUTH TABLES (keep plural - standard convention)
+// ============================================================================
 
 // Users table - compatible with NextAuth and OAuth providers (Auth0, Google, etc.)
 export const users = pgTable("users", {
@@ -219,7 +288,6 @@ export type Account = typeof accounts.$inferSelect;
 export type NewAccount = typeof accounts.$inferInsert;
 
 // Credentials table - for local username/password authentication
-// Separate from users table for security and flexibility
 export const credentials = pgTable("credentials", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
@@ -232,8 +300,11 @@ export const credentials = pgTable("credentials", {
 export type Credential = typeof credentials.$inferSelect;
 export type NewCredential = typeof credentials.$inferInsert;
 
-// Topics table
-export const topics = pgTable("topics", {
+// ============================================================================
+// TOPIC (formerly topics)
+// ============================================================================
+
+export const topic = pgTable("topic", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().unique(),
   type: text("type").notNull(), // Deities, Practices, Core Teachings, Texts, Historical Figures
@@ -241,63 +312,92 @@ export const topics = pgTable("topics", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type Topic = typeof topics.$inferSelect;
-export type NewTopic = typeof topics.$inferInsert;
+export type Topic = typeof topic.$inferSelect;
+export type NewTopic = typeof topic.$inferInsert;
 
-// Categories table
-export const categories = pgTable("categories", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull().unique(),
-  type: text("type").notNull(), // Deities, Practices, Core Teachings, Texts, Historical Figures
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export type Category = typeof categories.$inferSelect;
-export type NewCategory = typeof categories.$inferInsert;
-
-// Event Topics junction table (many-to-many)
-export const eventTopics = pgTable("event_topics", {
-  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
-  topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
-});
-
-export type EventTopic = typeof eventTopics.$inferSelect;
-export type NewEventTopic = typeof eventTopics.$inferInsert;
-
-// Event Categories junction table (many-to-many)
-export const eventCategories = pgTable("event_categories", {
-  eventId: uuid("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
-  categoryId: uuid("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
-});
-
-export type EventCategory = typeof eventCategories.$inferSelect;
-export type NewEventCategory = typeof eventCategories.$inferInsert;
-
-// Session Topics junction table (many-to-many)
-export const sessionTopics = pgTable("session_topics", {
-  sessionId: uuid("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
-  topicId: uuid("topic_id").notNull().references(() => topics.id, { onDelete: "cascade" }),
-});
-
-export type SessionTopic = typeof sessionTopics.$inferSelect;
-export type NewSessionTopic = typeof sessionTopics.$inferInsert;
-
-// Session Categories junction table (many-to-many)
-export const sessionCategories = pgTable("session_categories", {
-  sessionId: uuid("session_id").notNull().references(() => sessions.id, { onDelete: "cascade" }),
-  categoryId: uuid("category_id").notNull().references(() => categories.id, { onDelete: "cascade" }),
-});
-
-export type SessionCategory = typeof sessionCategories.$inferSelect;
-export type NewSessionCategory = typeof sessionCategories.$inferInsert;
+// Legacy alias
+export const topics = topic;
 
 // ============================================================================
-// ORGANIZATIONS (renamed from locations)
+// CATEGORY (formerly categories)
+// ============================================================================
+
+export const category = pgTable("category", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().unique(),
+  type: text("type").notNull(), // Deities, Practices, Core Teachings, Texts, Historical Figures
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type Category = typeof category.$inferSelect;
+export type NewCategory = typeof category.$inferInsert;
+
+// Legacy alias
+export const categories = category;
+
+// ============================================================================
+// JUNCTION TABLES
+// ============================================================================
+
+// Event Topic junction table
+export const eventTopic = pgTable("event_topic", {
+  eventId: uuid("event_id").notNull().references(() => event.id, { onDelete: "cascade" }),
+  topicId: uuid("topic_id").notNull().references(() => topic.id, { onDelete: "cascade" }),
+});
+
+export type EventTopic = typeof eventTopic.$inferSelect;
+export type NewEventTopic = typeof eventTopic.$inferInsert;
+
+// Legacy alias
+export const eventTopics = eventTopic;
+
+// Event Category junction table
+export const eventCategory = pgTable("event_category", {
+  eventId: uuid("event_id").notNull().references(() => event.id, { onDelete: "cascade" }),
+  categoryId: uuid("category_id").notNull().references(() => category.id, { onDelete: "cascade" }),
+});
+
+export type EventCategory = typeof eventCategory.$inferSelect;
+export type NewEventCategory = typeof eventCategory.$inferInsert;
+
+// Legacy alias
+export const eventCategories = eventCategory;
+
+// Event Session Topic junction table (formerly session_topics)
+export const eventSessionTopic = pgTable("event_session_topic", {
+  eventSessionId: uuid("event_session_id").notNull().references(() => eventSession.id, { onDelete: "cascade" }),
+  topicId: uuid("topic_id").notNull().references(() => topic.id, { onDelete: "cascade" }),
+});
+
+export type EventSessionTopic = typeof eventSessionTopic.$inferSelect;
+export type NewEventSessionTopic = typeof eventSessionTopic.$inferInsert;
+
+// Legacy aliases
+export const sessionTopics = eventSessionTopic;
+export type SessionTopic = EventSessionTopic;
+export type NewSessionTopic = NewEventSessionTopic;
+
+// Event Session Category junction table (formerly session_categories)
+export const eventSessionCategory = pgTable("event_session_category", {
+  eventSessionId: uuid("event_session_id").notNull().references(() => eventSession.id, { onDelete: "cascade" }),
+  categoryId: uuid("category_id").notNull().references(() => category.id, { onDelete: "cascade" }),
+});
+
+export type EventSessionCategory = typeof eventSessionCategory.$inferSelect;
+export type NewEventSessionCategory = typeof eventSessionCategory.$inferInsert;
+
+// Legacy aliases
+export const sessionCategories = eventSessionCategory;
+export type SessionCategory = EventSessionCategory;
+export type NewSessionCategory = NewEventSessionCategory;
+
+// ============================================================================
+// ORGANIZATION (formerly organizations)
 // Legal or administrative entities (organizers, hosts, sponsors)
 // ============================================================================
 
-export const organizations = pgTable("organizations", {
+export const organization = pgTable("organization", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
@@ -310,15 +410,18 @@ export const organizations = pgTable("organizations", {
   deletedAt: timestamp("deleted_at"),
 });
 
-export type Organization = typeof organizations.$inferSelect;
-export type NewOrganization = typeof organizations.$inferInsert;
+export type Organization = typeof organization.$inferSelect;
+export type NewOrganization = typeof organization.$inferInsert;
+
+// Legacy alias
+export const organizations = organization;
 
 // ============================================================================
-// LOCATIONS (site identity)
+// LOCATION (formerly locations)
 // Stable site where events occur (campus, retreat land, online platform)
 // ============================================================================
 
-export const locations = pgTable("locations", {
+export const location = pgTable("location", {
   id: uuid("id").defaultRandom().primaryKey(),
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
@@ -333,14 +436,17 @@ export const locations = pgTable("locations", {
   deletedAt: timestamp("deleted_at"),
 });
 
-export type Location = typeof locations.$inferSelect;
-export type NewLocation = typeof locations.$inferInsert;
+export type Location = typeof location.$inferSelect;
+export type NewLocation = typeof location.$inferInsert;
+
+// Legacy alias
+export const locations = location;
 
 // ============================================================================
-// ADDRESSES (independent entity)
+// ADDRESS (formerly addresses)
 // ============================================================================
 
-export const addresses = pgTable("addresses", {
+export const address = pgTable("address", {
   id: uuid("id").defaultRandom().primaryKey(),
   label: text("label"),
   city: text("city"),
@@ -356,17 +462,21 @@ export const addresses = pgTable("addresses", {
   deletedAt: timestamp("deleted_at"),
 });
 
-export type Address = typeof addresses.$inferSelect;
-export type NewAddress = typeof addresses.$inferInsert;
+export type Address = typeof address.$inferSelect;
+export type NewAddress = typeof address.$inferInsert;
+
+// Legacy alias
+export const addresses = address;
 
 // ============================================================================
-// LOCATION_ADDRESSES (junction table)
+// LOCATION_ADDRESS (formerly location_addresses)
+// Junction table linking locations to addresses
 // ============================================================================
 
-export const locationAddresses = pgTable("location_addresses", {
+export const locationAddress = pgTable("location_address", {
   id: uuid("id").defaultRandom().primaryKey(),
-  locationId: uuid("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  addressId: uuid("address_id").notNull().references(() => addresses.id, { onDelete: "cascade" }),
+  locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
+  addressId: uuid("address_id").notNull().references(() => address.id, { onDelete: "cascade" }),
   isPrimary: boolean("is_primary").notNull().default(false),
   effectiveFrom: date("effective_from", { mode: "string" }),
   effectiveTo: date("effective_to", { mode: "string" }),
@@ -374,36 +484,42 @@ export const locationAddresses = pgTable("location_addresses", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type LocationAddress = typeof locationAddresses.$inferSelect;
-export type NewLocationAddress = typeof locationAddresses.$inferInsert;
+export type LocationAddress = typeof locationAddress.$inferSelect;
+export type NewLocationAddress = typeof locationAddress.$inferInsert;
+
+// Legacy alias
+export const locationAddresses = locationAddress;
 
 // ============================================================================
-// ORGANIZATION_LOCATIONS (junction table)
-// Links organizations to their locations with role and primary designation
+// ORGANIZATION_LOCATION (formerly organization_locations)
+// Junction table linking organizations to locations
 // ============================================================================
 
-export const organizationLocations = pgTable("organization_locations", {
+export const organizationLocation = pgTable("organization_location", {
   id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-  locationId: uuid("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  role: text("role"), // HQ, branch, temporary (not surfaced in UI yet)
+  organizationId: uuid("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+  locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
+  role: text("role"), // HQ, branch, temporary
   isPrimary: boolean("is_primary").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export type OrganizationLocation = typeof organizationLocations.$inferSelect;
-export type NewOrganizationLocation = typeof organizationLocations.$inferInsert;
+export type OrganizationLocation = typeof organizationLocation.$inferSelect;
+export type NewOrganizationLocation = typeof organizationLocation.$inferInsert;
+
+// Legacy alias
+export const organizationLocations = organizationLocation;
 
 // ============================================================================
-// VENUES
+// VENUE (formerly venues)
 // Event-ready place: Location + Address + optional space label
 // ============================================================================
 
-export const venues = pgTable("venues", {
+export const venue = pgTable("venue", {
   id: uuid("id").defaultRandom().primaryKey(),
-  locationId: uuid("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  addressId: uuid("address_id").references(() => addresses.id, { onDelete: "set null" }), // Optional (null for online)
+  locationId: uuid("location_id").notNull().references(() => location.id, { onDelete: "cascade" }),
+  addressId: uuid("address_id").references(() => address.id, { onDelete: "set null" }), // Optional (null for online)
   spaceLabel: text("space_label"), // e.g., "Main Hall", "Room 201"
   name: text("name"), // Optional override name
   venueType: text("venue_type"), // hall, auditorium, outdoor, online_room
@@ -413,5 +529,165 @@ export const venues = pgTable("venues", {
   deletedAt: timestamp("deleted_at"),
 });
 
-export type Venue = typeof venues.$inferSelect;
-export type NewVenue = typeof venues.$inferInsert;
+export type Venue = typeof venue.$inferSelect;
+export type NewVenue = typeof venue.$inferInsert;
+
+// Legacy alias
+export const venues = venue;
+
+// ============================================================================
+// TRANSCRIPT (formerly transcripts)
+// Structured transcript metadata and workflow
+// ============================================================================
+
+export const transcript = pgTable("transcript", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Session-level references (new)
+  eventSessionId: uuid("event_session_id").references(() => eventSession.id, { onDelete: "cascade" }),
+  eventSessionAssetId: uuid("event_session_asset_id").references(() => eventSessionAsset.id, { onDelete: "set null" }),
+
+  // Asset-level references (existing)
+  mediaAssetId: uuid("media_asset_id").notNull().references(() => asset.id, { onDelete: "cascade" }),
+  canonicalAssetId: uuid("canonical_asset_id").references(() => asset.id, { onDelete: "set null" }),
+
+  // Language & Type
+  language: text("language").notNull(),                      // bo, en, zh, es, de, vi, fr, pt, multi
+  kind: text("kind").notNull().default("transcript"),        // transcript, translation
+  spokenSource: text("spoken_source"),                       // teacher, interpreter, mixed, unknown
+  spokenLanguage: text("spoken_language"),                   // bo, en, multi, unknown
+  translationOf: text("translation_of"),                     // teacher, interpreter, mixed, unknown (when kind=translation)
+
+  // Timecode & Source
+  timecodeStatus: text("timecode_status").default("none"),   // none, partial, full
+  source: text("source"),                                    // asr, human, hybrid
+
+  // Workflow
+  status: text("status").notNull().default("draft"),         // draft, reviewed, approved, published
+  version: integer("version").notNull().default(1),
+
+  // Attribution
+  createdBy: text("created_by"),
+  editedBy: text("edited_by"),
+
+  // System
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type Transcript = typeof transcript.$inferSelect;
+export type NewTranscript = typeof transcript.$inferInsert;
+
+// Legacy alias
+export const transcripts = transcript;
+
+// ============================================================================
+// TRANSCRIPT_REVISION (formerly transcript_revisions)
+// Immutable revision history for Transcript records
+// ============================================================================
+
+export const transcriptRevision = pgTable("transcript_revision", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // References
+  transcriptId: uuid("transcript_id").notNull().references(() => transcript.id, { onDelete: "cascade" }),
+  canonicalAssetId: uuid("canonical_asset_id").references(() => asset.id, { onDelete: "set null" }),
+
+  // Version tracking
+  versionNumber: integer("version_number").notNull(),
+
+  // Attribution
+  editedBy: text("edited_by"),
+  editedAt: timestamp("edited_at").defaultNow().notNull(),
+
+  // Context
+  changeNote: text("change_note"),
+  statusSnapshot: text("status_snapshot"),                   // workflow status at time of revision
+
+  // System (append-only, no updatedAt)
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type TranscriptRevision = typeof transcriptRevision.$inferSelect;
+export type NewTranscriptRevision = typeof transcriptRevision.$inferInsert;
+
+// Legacy alias
+export const transcriptRevisions = transcriptRevision;
+
+// ============================================================================
+// COLLECTION
+// Presentation playlists (event-scoped, user-created, or editorial)
+// ============================================================================
+
+export const collection = pgTable("collection", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  scope: text("scope").notNull(), // event, user, editorial
+  eventId: uuid("event_id").references(() => event.id, { onDelete: "cascade" }),
+  ownerId: uuid("owner_id"), // For user-created playlists
+  name: text("name").notNull(),
+  description: text("description"),
+  isDefault: boolean("is_default").notNull().default(false),
+  visibility: text("visibility").notNull().default("private"), // private, shared, public
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type Collection = typeof collection.$inferSelect;
+export type NewCollection = typeof collection.$inferInsert;
+
+// ============================================================================
+// COLLECTION_ITEM
+// Ordered presentation entries within a collection
+// References exactly one of: event_session, event_session_asset, or asset
+// ============================================================================
+
+export const collectionItem = pgTable("collection_item", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  collectionId: uuid("collection_id").notNull().references(() => collection.id, { onDelete: "cascade" }),
+
+  // Exactly one of these must be set
+  eventSessionId: uuid("event_session_id").references(() => eventSession.id, { onDelete: "set null" }),
+  eventSessionAssetId: uuid("event_session_asset_id").references(() => eventSessionAsset.id, { onDelete: "set null" }),
+  assetId: uuid("asset_id").references(() => asset.id, { onDelete: "set null" }),
+
+  // Ordering & Display
+  sequence: integer("sequence").notNull(),
+  label: text("label"),
+  occurrenceDate: date("occurrence_date", { mode: "string" }),
+  dayLabel: text("day_label"),
+  isContinuation: boolean("is_continuation").notNull().default(false),
+  relationshipType: text("relationship_type").notNull(), // session, session_variant, supplemental, reference
+
+  // System
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type CollectionItem = typeof collectionItem.$inferSelect;
+export type NewCollectionItem = typeof collectionItem.$inferInsert;
+
+// ============================================================================
+// RELATED_ASSET
+// Supplemental materials attached to any entity (polymorphic)
+// ============================================================================
+
+export const relatedAsset = pgTable("related_asset", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerType: text("owner_type").notNull(), // program, event, event_session, transcript
+  ownerId: uuid("owner_id").notNull(),
+  assetId: uuid("asset_id").notNull().references(() => asset.id, { onDelete: "cascade" }),
+  label: text("label"),
+  relatedType: text("related_type"), // ephemera, photo, document, reference, slide, other
+  sequence: integer("sequence"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type RelatedAsset = typeof relatedAsset.$inferSelect;
+export type NewRelatedAsset = typeof relatedAsset.$inferInsert;

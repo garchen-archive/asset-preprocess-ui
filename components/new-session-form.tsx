@@ -88,16 +88,6 @@ export function NewSessionForm({ eventsList, defaultEventId, allTopics, allCateg
             </div>
 
             <div>
-              <Label htmlFor="sequenceInEvent">Sequence in Event</Label>
-              <Input
-                id="sequenceInEvent"
-                name="sequenceInEvent"
-                type="number"
-                placeholder="1"
-              />
-            </div>
-
-            <div>
               <Label htmlFor="durationEstimated">Duration (Estimated)</Label>
               <Input
                 id="durationEstimated"

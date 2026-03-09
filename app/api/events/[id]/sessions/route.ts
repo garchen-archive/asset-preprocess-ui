@@ -13,11 +13,10 @@ export async function GET(
         id: sessions.id,
         sessionName: sessions.sessionName,
         sessionDate: sessions.sessionDate,
-        sequenceInEvent: sessions.sequenceInEvent,
       })
       .from(sessions)
       .where(eq(sessions.eventId, params.id))
-      .orderBy(asc(sessions.sequenceInEvent), asc(sessions.sessionDate));
+      .orderBy(asc(sessions.sessionDate), asc(sessions.sessionStartTime), asc(sessions.sessionName));
 
     return NextResponse.json(eventSessions);
   } catch (error) {

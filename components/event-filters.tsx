@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CollapsibleFilterSection } from "@/components/collapsible-filter-section";
-import { SearchableSelect } from "@/components/searchable-select";
+import { FilterMultiSelect } from "@/components/filter-multi-select";
 import { OrgSelect } from "@/components/org-select";
 
 interface EventFiltersProps {
@@ -12,6 +12,7 @@ interface EventFiltersProps {
   viewFilter: string;
   statusFilter: string;
   typeFilter: string;
+  formatFilter: string;
   sourceFilter: string;
   organizerFilter: string;
   hostingCenterFilter: string;
@@ -21,15 +22,15 @@ interface EventFiltersProps {
   dateFromFilter: string;
   dateToFilter: string;
   dateExactFilter: string;
-  topicFilter: string;
-  categoryFilter: string;
+  selectedTopicIds: string[];
+  selectedCategoryIds: string[];
   availableTypes: { type: string | null }[];
   availableOrganizers: { id: string; code: string; name: string }[];
   availableHostingCenters: string[];
   availableCountries: string[];
   availableLocationTexts: string[];
-  availableTopics: string[];
-  availableCategories: string[];
+  availableTopics: { id: string; name: string }[];
+  availableCategories: { id: string; name: string }[];
 }
 
 export function EventFilters({
@@ -37,6 +38,7 @@ export function EventFilters({
   viewFilter,
   statusFilter,
   typeFilter,
+  formatFilter,
   sourceFilter,
   organizerFilter,
   hostingCenterFilter,
@@ -46,8 +48,8 @@ export function EventFilters({
   dateFromFilter,
   dateToFilter,
   dateExactFilter,
-  topicFilter,
-  categoryFilter,
+  selectedTopicIds,
+  selectedCategoryIds,
   availableTypes,
   availableOrganizers,
   availableHostingCenters,
@@ -60,8 +62,8 @@ export function EventFilters({
     (dateFromFilter ? 1 : 0) +
     (dateToFilter ? 1 : 0) +
     (dateExactFilter ? 1 : 0) +
-    (topicFilter ? 1 : 0) +
-    (categoryFilter ? 1 : 0);
+    selectedTopicIds.length +
+    selectedCategoryIds.length;
 
   const metadataFilterCount =
     (hostingCenterFilter ? 1 : 0) +
@@ -74,6 +76,7 @@ export function EventFilters({
     viewFilter !== "all" ||
     statusFilter ||
     typeFilter ||
+    formatFilter ||
     sourceFilter ||
     organizerFilter ||
     hostingCenterFilter ||
@@ -83,13 +86,13 @@ export function EventFilters({
     dateFromFilter ||
     dateToFilter ||
     dateExactFilter ||
-    topicFilter ||
-    categoryFilter;
+    selectedTopicIds.length > 0 ||
+    selectedCategoryIds.length > 0;
 
   return (
     <form className="rounded-lg border p-3" method="GET">
       {/* Primary filters - always visible */}
-      <div className="grid grid-cols-2 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
         <div className="col-span-2">
           <label className="text-xs font-medium mb-1 block">Search</label>
           <Input
@@ -154,6 +157,21 @@ export function EventFilters({
         </div>
 
         <div>
+          <label className="text-xs font-medium mb-1 block">Format</label>
+          <select
+            name="format"
+            defaultValue={formatFilter}
+            className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
+          >
+            <option value="">All</option>
+            <option value="single_recording">Single Recording</option>
+            <option value="series">Series</option>
+            <option value="retreat">Retreat</option>
+            <option value="collection">Collection</option>
+          </select>
+        </div>
+
+        <div>
           <label className="text-xs font-medium mb-1 block">Source</label>
           <select
             name="source"
@@ -208,12 +226,13 @@ export function EventFilters({
           {/* Topic */}
           {availableTopics.length > 0 && (
             <div>
-              <label className="text-xs font-medium mb-1 block">Topic</label>
-              <SearchableSelect
-                options={availableTopics}
-                value={topicFilter}
-                name="topic"
-                placeholder="Search topics..."
+              <FilterMultiSelect
+                name="topicIds"
+                label="Topics"
+                options={availableTopics.map(t => ({ value: t.id, label: t.name }))}
+                selectedValues={selectedTopicIds}
+                placeholder="Select topics..."
+                compact
               />
             </div>
           )}
@@ -221,12 +240,13 @@ export function EventFilters({
           {/* Category */}
           {availableCategories.length > 0 && (
             <div>
-              <label className="text-xs font-medium mb-1 block">Category</label>
-              <SearchableSelect
-                options={availableCategories}
-                value={categoryFilter}
-                name="category"
-                placeholder="Search categories..."
+              <FilterMultiSelect
+                name="categoryIds"
+                label="Categories"
+                options={availableCategories.map(c => ({ value: c.id, label: c.name }))}
+                selectedValues={selectedCategoryIds}
+                placeholder="Select categories..."
+                compact
               />
             </div>
           )}

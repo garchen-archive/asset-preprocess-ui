@@ -48,14 +48,14 @@ export default async function EditSessionPage({
     .select({ id: topics.id })
     .from(sessionTopics)
     .innerJoin(topics, eq(sessionTopics.topicId, topics.id))
-    .where(eq(sessionTopics.sessionId, params.id));
+    .where(eq(sessionTopics.eventSessionId, params.id));
 
   // Get currently selected categories for this session
   const selectedSessionCategories = await db
     .select({ id: categories.id })
     .from(sessionCategories)
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
-    .where(eq(sessionCategories.sessionId, params.id));
+    .where(eq(sessionCategories.eventSessionId, params.id));
 
   return (
     <EditSessionForm

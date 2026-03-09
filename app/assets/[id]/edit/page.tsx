@@ -486,7 +486,7 @@ export default async function AssetEditPage({
                 events={eventsList}
                 sessions={sessionsList}
                 defaultEventId={data.eventId}
-                defaultSessionId={data.sessionId}
+                defaultSessionId={data.eventSessionId}
               />
             </div>
 
