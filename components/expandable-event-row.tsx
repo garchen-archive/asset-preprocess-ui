@@ -9,7 +9,6 @@ interface Session {
   id: string;
   sessionName: string;
   sessionDate: string | null;
-  sequenceInEvent: number | null;
 }
 
 interface ChildEvent {
@@ -41,6 +40,8 @@ interface ExpandableEventRowProps {
   childEventCount: number;
   sessionCount: number;
   assetCount: number;
+  topicNames: string | null;
+  categoryNames: string | null;
   index: number;
   isSelected?: boolean;
   onToggleSelect?: () => void;
@@ -76,6 +77,8 @@ export function ExpandableEventRow({
   childEventCount,
   sessionCount,
   assetCount,
+  topicNames,
+  categoryNames,
   index,
   isSelected,
   onToggleSelect,
@@ -174,10 +177,10 @@ export function ExpandableEventRow({
           </td>
         )}
         {visibleColumns.topic && (
-          <td className="px-4 py-3 text-sm">{event.topic || "—"}</td>
+          <td className="px-4 py-3 text-sm">{topicNames || "—"}</td>
         )}
         {visibleColumns.category && (
-          <td className="px-4 py-3 text-sm">{event.category || "—"}</td>
+          <td className="px-4 py-3 text-sm">{categoryNames || "—"}</td>
         )}
         {visibleColumns.hostOrg && (
           <td className="px-4 py-3 text-sm">{hostOrgName || "—"}</td>
@@ -296,11 +299,6 @@ export function ExpandableEventRow({
                             href={`/sessions/${session.id}`}
                             className="text-blue-600 hover:underline inline-flex items-center gap-2"
                           >
-                            <span className="font-mono text-xs text-muted-foreground">
-                              {session.sequenceInEvent
-                                ? `#${session.sequenceInEvent}`
-                                : "—"}
-                            </span>
                             <span>{session.sessionName}</span>
                             {session.sessionDate && (
                               <span className="text-xs text-muted-foreground">

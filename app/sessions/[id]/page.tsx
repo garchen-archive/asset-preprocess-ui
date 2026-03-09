@@ -45,7 +45,7 @@ export default async function SessionDetailPage({
   const sessionAssets = await db
     .select()
     .from(archiveAssets)
-    .where(eq(archiveAssets.sessionId, params.id));
+    .where(eq(archiveAssets.eventSessionId, params.id));
 
   // Get topics for this session
   const sessionTopicsList = await db
@@ -55,7 +55,7 @@ export default async function SessionDetailPage({
     })
     .from(sessionTopics)
     .innerJoin(topics, eq(sessionTopics.topicId, topics.id))
-    .where(eq(sessionTopics.sessionId, params.id));
+    .where(eq(sessionTopics.eventSessionId, params.id));
 
   // Get categories for this session
   const sessionCategoriesList = await db
@@ -65,7 +65,7 @@ export default async function SessionDetailPage({
     })
     .from(sessionCategories)
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
-    .where(eq(sessionCategories.sessionId, params.id));
+    .where(eq(sessionCategories.eventSessionId, params.id));
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -130,10 +130,6 @@ export default async function SessionDetailPage({
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Duration (Estimated)</dt>
                 <dd className="text-sm mt-1">{session.durationEstimated || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Sequence in Event</dt>
-                <dd className="text-sm mt-1">{session.sequenceInEvent || "—"}</dd>
               </div>
             </dl>
           </div>

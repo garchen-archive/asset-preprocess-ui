@@ -209,15 +209,15 @@ export default async function AssetsPage({
     }
   }
 
-  // Has transcript record filter (checks existence in transcripts table)
+  // Has transcript record filter (checks existence in transcript table)
   if (hasTranscriptRecordFilter) {
     if (hasTranscriptRecordFilter === "true") {
       conditions.push(
-        sql`EXISTS (SELECT 1 FROM transcripts t WHERE t.media_asset_id = ${archiveAssets.id} AND t.deleted_at IS NULL)`
+        sql`EXISTS (SELECT 1 FROM transcript t WHERE t.media_asset_id = ${archiveAssets.id} AND t.deleted_at IS NULL)`
       );
     } else if (hasTranscriptRecordFilter === "false") {
       conditions.push(
-        sql`NOT EXISTS (SELECT 1 FROM transcripts t WHERE t.media_asset_id = ${archiveAssets.id} AND t.deleted_at IS NULL)`
+        sql`NOT EXISTS (SELECT 1 FROM transcript t WHERE t.media_asset_id = ${archiveAssets.id} AND t.deleted_at IS NULL)`
       );
     }
   }

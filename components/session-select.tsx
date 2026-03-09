@@ -8,7 +8,6 @@ interface Session {
   id: string;
   sessionName: string;
   sessionDate: string | null;
-  sequenceInEvent: number | null;
   eventId: string | null;
 }
 
@@ -130,7 +129,6 @@ export function SessionSelect({
                     {[
                       item.event?.eventName,
                       item.session.sessionDate && formatDate(item.session.sessionDate),
-                      item.session.sequenceInEvent && `#${item.session.sequenceInEvent}`,
                     ].filter(Boolean).join(" · ")}
                   </div>
                 </div>
@@ -159,9 +157,6 @@ export function SessionSelect({
             )}
             {selectedSession.session.sessionDate && (
               <span><span className="opacity-50">Date:</span> {formatDate(selectedSession.session.sessionDate)}</span>
-            )}
-            {selectedSession.session.sequenceInEvent && (
-              <span><span className="opacity-50">Seq:</span> #{selectedSession.session.sequenceInEvent}</span>
             )}
           </div>
           <div>

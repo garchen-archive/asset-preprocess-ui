@@ -293,7 +293,18 @@ export function AssetsTable({
                   </td>
                 )}
                 {isColumnVisible("title") && (
-                  <td className="px-4 py-3 text-sm">{asset.title || "—"}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {asset.title ? (
+                      <Link
+                        href={`/assets/${asset.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {asset.title}
+                      </Link>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                 )}
                 {isColumnVisible("type") && (
                   <td className="px-4 py-3 text-sm">

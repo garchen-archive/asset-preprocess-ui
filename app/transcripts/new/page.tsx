@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { archiveAssets } from "@/lib/db/schema";
-import { or, eq, inArray } from "drizzle-orm";
+import { archiveAssets, sessions, events } from "@/lib/db/schema";
+import { or, eq, inArray, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
 
@@ -49,6 +49,19 @@ export default async function NewTranscriptPage({
     .orderBy(archiveAssets.name)
     .limit(1000);
 
+  // Fetch event sessions for linking
+  const eventSessions = await db
+    .select({
+      id: sessions.id,
+      sessionName: sessions.sessionName,
+      eventName: events.eventName,
+    })
+    .from(sessions)
+    .leftJoin(events, eq(sessions.eventId, events.id))
+    .where(isNull(sessions.deletedAt))
+    .orderBy(sessions.sessionName)
+    .limit(1000);
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -70,6 +83,7 @@ export default async function NewTranscriptPage({
         mode="create"
         mediaAssets={mediaAssets}
         transcriptAssets={transcriptAssets}
+        eventSessions={eventSessions}
         defaultMediaAssetId={searchParams.mediaAssetId}
         cancelHref="/transcripts"
       />

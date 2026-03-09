@@ -16,6 +16,8 @@ type EventRow = {
   sessionCount: number;
   assetCount: number;
   childEventCount: number;
+  topicNames: string | null;
+  categoryNames: string | null;
 };
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
@@ -39,7 +41,7 @@ type EventsPageClientProps = {
   offset: number;
   sortBy: string;
   sortOrder: string;
-  searchParams: Record<string, string | undefined>;
+  searchParams: Record<string, string | string[] | undefined>;
 };
 
 export function EventsPageClient({
@@ -64,7 +66,12 @@ export function EventsPageClient({
     const newSortOrder = sortBy === column && sortOrder === "asc" ? "desc" : "asc";
     const params = new URLSearchParams();
     Object.entries(searchParams).forEach(([key, value]) => {
-      if (value != null && value !== "") params.set(key, value);
+      if (value == null || value === "") return;
+      if (Array.isArray(value)) {
+        value.forEach(v => params.append(key, v));
+      } else {
+        params.set(key, value);
+      }
     });
     params.set("sortBy", column);
     params.set("sortOrder", newSortOrder);
@@ -211,7 +218,7 @@ export function EventsPageClient({
             </tr>
           </thead>
           <tbody>
-            {eventsList.map(({ event, parentEventName, organizerName, hostOrgName, sessionCount, assetCount, childEventCount }, index) => (
+            {eventsList.map(({ event, parentEventName, organizerName, hostOrgName, sessionCount, assetCount, childEventCount, topicNames, categoryNames }, index) => (
               <ExpandableEventRow
                 key={event.id}
                 event={event}
@@ -221,6 +228,8 @@ export function EventsPageClient({
                 childEventCount={childEventCount}
                 sessionCount={sessionCount}
                 assetCount={assetCount}
+                topicNames={topicNames}
+                categoryNames={categoryNames}
                 index={index + offset}
                 isSelected={selectedEventIds.includes(event.id)}
                 onToggleSelect={() => handleToggleEvent(event.id)}

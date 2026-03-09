@@ -18,7 +18,6 @@ interface Session {
   id: string;
   sessionName: string;
   sessionDate: string | null;
-  sequenceInEvent: number | null;
   eventId: string | null;
 }
 
@@ -56,7 +55,7 @@ export function BulkAssignModal({
       const result = await bulkAssignAssets({
         assetIds: selectedAssetIds,
         eventId: mode === "event" ? selectedEventId : null,
-        sessionId: mode === "session" ? selectedSessionId : null,
+        eventSessionId: mode === "session" ? selectedSessionId : null,
       });
 
       if (result.success) {

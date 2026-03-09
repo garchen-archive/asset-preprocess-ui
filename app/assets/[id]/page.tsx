@@ -21,7 +21,7 @@ export default async function AssetDetailPage({
       sessionEvent: events, // Event via session
     })
     .from(archiveAssets)
-    .leftJoin(sessions, eq(archiveAssets.sessionId, sessions.id))
+    .leftJoin(sessions, eq(archiveAssets.eventSessionId, sessions.id))
     .leftJoin(events, eq(sessions.eventId, events.id))
     .where(eq(archiveAssets.id, params.id))
     .limit(1);
@@ -59,22 +59,8 @@ export default async function AssetDetailPage({
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
-    { label: "Events", href: "/events" },
+    { label: "Assets", href: "/assets" },
   ];
-
-  if (event) {
-    breadcrumbItems.push({
-      label: event.eventName,
-      href: `/events/${event.id}`,
-    });
-  }
-
-  if (session) {
-    breadcrumbItems.push({
-      label: session.sessionName,
-      href: `/sessions/${session.id}`,
-    });
-  }
 
   breadcrumbItems.push({ label: data.title || data.name || "Untitled Asset" });
 
@@ -488,11 +474,11 @@ export default async function AssetDetailPage({
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Assignment Level</dt>
                 <dd className="text-sm mt-1">
-                  {data.eventId && !data.sessionId ? (
+                  {data.eventId && !data.eventSessionId ? (
                     <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700">
                       Event (Direct)
                     </span>
-                  ) : data.sessionId && !data.eventId ? (
+                  ) : data.eventSessionId && !data.eventId ? (
                     <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700">
                       Session (Detailed)
                     </span>

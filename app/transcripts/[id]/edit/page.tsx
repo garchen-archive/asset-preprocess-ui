@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { transcripts, archiveAssets } from "@/lib/db/schema";
-import { eq, or, inArray } from "drizzle-orm";
+import { transcripts, archiveAssets, sessions, events } from "@/lib/db/schema";
+import { eq, or, inArray, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
@@ -55,6 +55,19 @@ export default async function EditTranscriptPage({
     .orderBy(archiveAssets.name)
     .limit(1000);
 
+  // Fetch event sessions for linking
+  const eventSessions = await db
+    .select({
+      id: sessions.id,
+      sessionName: sessions.sessionName,
+      eventName: events.eventName,
+    })
+    .from(sessions)
+    .leftJoin(events, eq(sessions.eventId, events.id))
+    .where(isNull(sessions.deletedAt))
+    .orderBy(sessions.sessionName)
+    .limit(1000);
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -78,6 +91,7 @@ export default async function EditTranscriptPage({
         transcript={transcript}
         mediaAssets={[]}
         transcriptAssets={transcriptAssets}
+        eventSessions={eventSessions}
         linkedMediaAsset={mediaAsset}
         cancelHref={`/transcripts/${params.id}`}
       />

@@ -70,10 +70,18 @@ type TranscriptAsset = {
   fileFormat: string | null;
 };
 
+type EventSessionOption = {
+  id: string;
+  sessionName: string;
+  eventName?: string | null;
+};
+
 type TranscriptData = {
   id: string;
   mediaAssetId: string;
   canonicalAssetId: string | null;
+  eventSessionId: string | null;
+  eventSessionAssetId: string | null;
   language: string;
   kind: string;
   spokenSource: string | null;
@@ -94,6 +102,7 @@ interface TranscriptFormProps {
   transcript?: TranscriptData;
   mediaAssets: MediaAsset[];
   transcriptAssets: TranscriptAsset[];
+  eventSessions?: EventSessionOption[];
   linkedMediaAsset?: MediaAsset | null;
   defaultMediaAssetId?: string;
   cancelHref: string;
@@ -104,6 +113,7 @@ export function TranscriptForm({
   transcript,
   mediaAssets,
   transcriptAssets,
+  eventSessions = [],
   linkedMediaAsset,
   defaultMediaAssetId,
   cancelHref,
@@ -117,6 +127,9 @@ export function TranscriptForm({
   );
   const [canonicalAssetId, setCanonicalAssetId] = useState(
     transcript?.canonicalAssetId || ""
+  );
+  const [eventSessionId, setEventSessionId] = useState(
+    transcript?.eventSessionId || ""
   );
   const [language, setLanguage] = useState(transcript?.language || "en");
   const [kind, setKind] = useState(transcript?.kind || "transcript");
@@ -142,6 +155,13 @@ export function TranscriptForm({
     label: `${asset.title || asset.name} (${asset.fileFormat || asset.assetType})`,
   }));
 
+  const eventSessionOptions = eventSessions.map((session) => ({
+    value: session.id,
+    label: session.eventName
+      ? `${session.sessionName} (${session.eventName})`
+      : session.sessionName,
+  }));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -149,6 +169,7 @@ export function TranscriptForm({
     const formData = new FormData();
     formData.set("mediaAssetId", mediaAssetId);
     formData.set("canonicalAssetId", canonicalAssetId);
+    formData.set("eventSessionId", eventSessionId);
     formData.set("language", language);
     formData.set("kind", kind);
     formData.set("spokenSource", spokenSource);
@@ -220,6 +241,21 @@ export function TranscriptForm({
             />
             <p className="text-xs text-muted-foreground mt-1">
               The SRT, VTT, or document file containing the transcript text.
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="eventSessionId">Event Session (Optional)</Label>
+            <SearchableSelect
+              options={eventSessionOptions}
+              value={eventSessionId}
+              onChange={setEventSessionId}
+              placeholder="Search event sessions..."
+              name="eventSessionId"
+              emptyLabel="No session linked"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Link this transcript to a specific event session.
             </p>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteEvent } from "@/lib/actions";
 import { formatDate, getDateMeta, type DateMeta } from "@/lib/utils";
+import { BulkAddSessionsButton } from "@/components/bulk-add-sessions-modal";
 
 export const dynamic = "force-dynamic";
 
@@ -43,11 +44,12 @@ export default async function EventDetailPage({
   // Extract date metadata for display
   const dateMeta = getDateMeta(event.additionalMetadata);
 
-  // Get sessions in this event
+  // Get sessions in this event, ordered by date and time
   const eventSessions = await db
     .select()
     .from(sessions)
-    .where(eq(sessions.eventId, params.id));
+    .where(eq(sessions.eventId, params.id))
+    .orderBy(sessions.sessionDate, sessions.sessionStartTime, sessions.sessionName);
 
   // Get assets directly assigned to this event (no session)
   const directEventAssets = await db
@@ -57,7 +59,7 @@ export default async function EventDetailPage({
       name: archiveAssets.name,
       assetType: archiveAssets.assetType,
       duration: archiveAssets.duration,
-      sessionId: archiveAssets.sessionId,
+      eventSessionId: archiveAssets.eventSessionId,
       catalogingStatus: archiveAssets.catalogingStatus,
     })
     .from(archiveAssets)
@@ -73,11 +75,11 @@ export default async function EventDetailPage({
           name: archiveAssets.name,
           assetType: archiveAssets.assetType,
           duration: archiveAssets.duration,
-          sessionId: archiveAssets.sessionId,
+          eventSessionId: archiveAssets.eventSessionId,
           catalogingStatus: archiveAssets.catalogingStatus,
         })
         .from(archiveAssets)
-        .where(inArray(archiveAssets.sessionId, sessionIds))
+        .where(inArray(archiveAssets.eventSessionId, sessionIds))
     : [];
 
   const totalAssetCount = directEventAssets.length + sessionAssets.length;
@@ -173,6 +175,21 @@ export default async function EventDetailPage({
     .from(eventCategories)
     .innerJoin(categories, eq(eventCategories.categoryId, categories.id))
     .where(eq(eventCategories.eventId, params.id));
+
+  // Get all topics and categories for bulk add typeahead
+  const allTopics = await db
+    .select({
+      id: topics.id,
+      name: topics.name,
+    })
+    .from(topics);
+
+  const allCategories = await db
+    .select({
+      id: categories.id,
+      name: categories.name,
+    })
+    .from(categories);
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -467,9 +484,18 @@ export default async function EventDetailPage({
           <div className="rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Sessions ({eventSessions.length})</h2>
-              <Button size="sm" asChild>
-                <Link href={`/sessions/new?eventId=${params.id}`}>Add Session</Link>
-              </Button>
+              <div className="flex gap-2">
+                <BulkAddSessionsButton
+                  eventId={params.id}
+                  eventName={event.eventName}
+                  defaultDate={event.eventDateStart ? new Date(event.eventDateStart).toISOString().split("T")[0] : ""}
+                  topics={allTopics}
+                  categories={allCategories}
+                />
+                <Button size="sm" asChild>
+                  <Link href={`/sessions/new?eventId=${params.id}`}>Add Session</Link>
+                </Button>
+              </div>
             </div>
             {eventSessions.length > 0 ? (
               <div className="rounded-md border">
@@ -591,7 +617,7 @@ export default async function EventDetailPage({
                     </thead>
                     <tbody>
                       {sessionAssets.map((asset) => {
-                        const session = eventSessions.find(s => s.id === asset.sessionId);
+                        const session = eventSessions.find(s => s.id === asset.eventSessionId);
                         return (
                           <tr key={asset.id} className="border-b hover:bg-muted/50">
                             <td className="px-4 py-3 text-sm">

@@ -52,7 +52,6 @@ type Session = {
   id: string;
   sessionName: string;
   sessionDate: string | null;
-  sequenceInEvent: number | null;
   eventId: string | null;
 };
 

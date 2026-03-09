@@ -5,7 +5,7 @@ interface PaginationProps {
   currentPage: number;
   totalPages: number;
   basePath: string;
-  searchParams: Record<string, string>;
+  searchParams: Record<string, string | string[] | undefined>;
 }
 
 export function Pagination({
@@ -19,10 +19,19 @@ export function Pagination({
   }
 
   const buildUrl = (page: number) => {
-    const params = new URLSearchParams({
-      ...searchParams,
-      page: String(page),
+    const params = new URLSearchParams();
+
+    // Handle both string and array values
+    Object.entries(searchParams).forEach(([key, value]) => {
+      if (value === undefined) return;
+      if (Array.isArray(value)) {
+        value.forEach(v => params.append(key, v));
+      } else {
+        params.set(key, value);
+      }
     });
+
+    params.set('page', String(page));
     return `${basePath}?${params.toString()}`;
   };
 

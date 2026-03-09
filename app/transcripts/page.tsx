@@ -46,7 +46,7 @@ export default async function TranscriptsPage({
 
   // Search by media asset name
   const searchCondition = search
-    ? sql`EXISTS (SELECT 1 FROM archive_assets aa WHERE aa.id = ${transcripts.mediaAssetId} AND (aa.name ILIKE ${`%${search}%`} OR aa.title ILIKE ${`%${search}%`}))`
+    ? sql`EXISTS (SELECT 1 FROM asset aa WHERE aa.id = ${transcripts.mediaAssetId} AND (aa.name ILIKE ${`%${search}%`} OR aa.title ILIKE ${`%${search}%`}))`
     : undefined;
 
   if (searchCondition) {

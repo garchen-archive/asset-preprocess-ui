@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { events, organizations } from "@/lib/db/schema";
-import { asc, desc, ilike, eq, and, sql, gte, lte } from "drizzle-orm";
+import { events, organizations, topics, categories, eventTopics, eventCategories } from "@/lib/db/schema";
+import { asc, desc, eq, and, sql, gte, lte, exists, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/pagination";
@@ -27,8 +27,8 @@ export default async function EventsPage({
     dateFrom?: string;
     dateTo?: string;
     dateExact?: string;
-    topic?: string;
-    category?: string;
+    topicIds?: string | string[];
+    categoryIds?: string | string[];
     sortBy?: string;
     sortOrder?: string;
     page?: string;
@@ -48,8 +48,15 @@ export default async function EventsPage({
   const dateFromFilter = searchParams.dateFrom || "";
   const dateToFilter = searchParams.dateTo || "";
   const dateExactFilter = searchParams.dateExact || "";
-  const topicFilter = searchParams.topic || "";
-  const categoryFilter = searchParams.category || "";
+  // Handle topic/category IDs as arrays (can be single string or array from URL params)
+  const topicIdsParam = searchParams.topicIds;
+  const topicIds: string[] = topicIdsParam
+    ? (Array.isArray(topicIdsParam) ? topicIdsParam : [topicIdsParam])
+    : [];
+  const categoryIdsParam = searchParams.categoryIds;
+  const categoryIds: string[] = categoryIdsParam
+    ? (Array.isArray(categoryIdsParam) ? categoryIdsParam : [categoryIdsParam])
+    : [];
   const sortBy = searchParams.sortBy || "createdAt";
   const sortOrder = searchParams.sortOrder || "desc";
   const page = parseInt(searchParams.page || "1");
@@ -138,14 +145,32 @@ export default async function EventsPage({
     conditions.push(lte(events.eventDateStart, dateToFilter));
   }
 
-  // Topic filter (comma-delimited field, use ILIKE for partial match)
-  if (topicFilter) {
-    conditions.push(ilike(events.topic, `%${topicFilter}%`));
+  // Topic filter using join table (supports multiple selection with OR logic)
+  if (topicIds.length > 0) {
+    conditions.push(
+      exists(
+        db.select({ one: sql`1` })
+          .from(eventTopics)
+          .where(and(
+            eq(eventTopics.eventId, events.id),
+            inArray(eventTopics.topicId, topicIds)
+          ))
+      )
+    );
   }
 
-  // Category filter (comma-delimited field, use ILIKE for partial match)
-  if (categoryFilter) {
-    conditions.push(ilike(events.category, `%${categoryFilter}%`));
+  // Category filter using join table (supports multiple selection with OR logic)
+  if (categoryIds.length > 0) {
+    conditions.push(
+      exists(
+        db.select({ one: sql`1` })
+          .from(eventCategories)
+          .where(and(
+            eq(eventCategories.eventId, events.id),
+            inArray(eventCategories.categoryId, categoryIds)
+          ))
+      )
+    );
   }
 
   // Get total count for pagination
@@ -162,51 +187,69 @@ export default async function EventsPage({
       event: events,
       parentEventName: sql<string>`
         (SELECT e2.event_name
-         FROM events e2
-         WHERE e2.id = events.parent_event_id)
+         FROM event e2
+         WHERE e2.id = event.parent_event_id)
       `.as('parent_event_name'),
       organizerName: sql<string>`
         (SELECT o.name
-         FROM organizations o
-         WHERE o.id = events.organizer_organization_id)
+         FROM organization o
+         WHERE o.id = event.organizer_organization_id)
       `.as('organizer_name'),
       hostOrgName: sql<string>`
         (SELECT o.name
-         FROM organizations o
-         WHERE o.id = events.host_organization_id)
+         FROM organization o
+         WHERE o.id = event.host_organization_id)
       `.as('host_org_name'),
       sessionCount: sql<number>`
         COALESCE(
           (SELECT COUNT(*)
-           FROM sessions s
-           WHERE s.event_id = events.id
+           FROM event_session s
+           WHERE s.event_id = event.id
           ), 0
         )::int
       `.as('session_count'),
       assetCount: sql<number>`
         COALESCE(
           (SELECT COUNT(DISTINCT a.id)
-           FROM archive_assets a
-           WHERE a.event_id = events.id
-              OR a.session_id IN (SELECT s.id FROM sessions s WHERE s.event_id = events.id)
+           FROM asset a
+           WHERE a.event_id = event.id
+              OR a.event_session_id IN (SELECT s.id FROM event_session s WHERE s.event_id = event.id)
           ), 0
         )::int
       `.as('asset_count'),
       childEventCount: sql<number>`
         COALESCE(
           (SELECT COUNT(*)
-           FROM events e
-           WHERE e.parent_event_id = events.id
+           FROM event e
+           WHERE e.parent_event_id = event.id
           ), 0
         )::int
       `.as('child_event_count'),
+      topicNames: sql<string>`
+        COALESCE(
+          (SELECT string_agg(t.name, ', ' ORDER BY t.name)
+           FROM event_topic et
+           JOIN topic t ON t.id = et.topic_id
+           WHERE et.event_id = event.id
+          ), ''
+        )
+      `.as('topic_names'),
+      categoryNames: sql<string>`
+        COALESCE(
+          (SELECT string_agg(c.name, ', ' ORDER BY c.name)
+           FROM event_category ec
+           JOIN category c ON c.id = ec.category_id
+           WHERE ec.event_id = event.id
+          ), ''
+        )
+      `.as('category_names'),
     })
     .from(events)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy((() => {
       // Handle special cases for sorting by related fields
       if (sortBy === "hostOrg") {
-        const hostOrgSort = sql`(SELECT o.name FROM organizations o WHERE o.id = events.host_organization_id)`;
+        const hostOrgSort = sql`(SELECT o.name FROM organization o WHERE o.id = event.host_organization_id)`;
         return sortOrder === "asc" ? asc(hostOrgSort) : desc(hostOrgSort);
       }
       const col = {
@@ -271,19 +314,19 @@ export default async function EventsPage({
       .from(organizations)
       .orderBy(organizations.name),
 
-    // Distinct topics
+    // Topics that are assigned to at least one event (via join table)
     db
-      .selectDistinct({ topic: events.topic })
-      .from(events)
-      .where(sql`${events.topic} IS NOT NULL AND ${events.topic} != ''`)
-      .orderBy(events.topic),
+      .selectDistinct({ id: topics.id, name: topics.name })
+      .from(topics)
+      .innerJoin(eventTopics, eq(topics.id, eventTopics.topicId))
+      .orderBy(topics.name),
 
-    // Distinct categories
+    // Categories that are assigned to at least one event (via join table)
     db
-      .selectDistinct({ category: events.category })
-      .from(events)
-      .where(sql`${events.category} IS NOT NULL AND ${events.category} != ''`)
-      .orderBy(events.category),
+      .selectDistinct({ id: categories.id, name: categories.name })
+      .from(categories)
+      .innerJoin(eventCategories, eq(categories.id, eventCategories.categoryId))
+      .orderBy(categories.name),
   ]);
 
   return (
@@ -316,15 +359,15 @@ export default async function EventsPage({
         dateFromFilter={dateFromFilter}
         dateToFilter={dateToFilter}
         dateExactFilter={dateExactFilter}
-        topicFilter={topicFilter}
-        categoryFilter={categoryFilter}
+        selectedTopicIds={topicIds}
+        selectedCategoryIds={categoryIds}
         availableTypes={types}
         availableOrganizers={allOrganizations}
         availableHostingCenters={hostingCenters.map((h) => h.value).filter(Boolean)}
         availableCountries={countries.map((c) => c.value).filter(Boolean)}
         availableLocationTexts={locationTexts.map((l) => l.value).filter(Boolean)}
-        availableTopics={distinctTopics.map((t) => t.topic).filter(Boolean) as string[]}
-        availableCategories={distinctCategories.map((c) => c.category).filter(Boolean) as string[]}
+        availableTopics={distinctTopics}
+        availableCategories={distinctCategories}
       />
 
       {/* Results Info */}
@@ -363,8 +406,8 @@ export default async function EventsPage({
           ...(dateFromFilter && { dateFrom: dateFromFilter }),
           ...(dateToFilter && { dateTo: dateToFilter }),
           ...(dateExactFilter && { dateExact: dateExactFilter }),
-          ...(topicFilter && { topic: topicFilter }),
-          ...(categoryFilter && { category: categoryFilter }),
+          ...(topicIds.length > 0 && { topicIds }),
+          ...(categoryIds.length > 0 && { categoryIds }),
           ...(sortBy !== "createdAt" && { sortBy }),
           ...(sortOrder !== "desc" && { sortOrder }),
         }}

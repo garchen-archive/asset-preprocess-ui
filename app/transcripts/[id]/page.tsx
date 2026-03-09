@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { transcripts, transcriptRevisions, archiveAssets } from "@/lib/db/schema";
+import { transcripts, transcriptRevisions, archiveAssets, sessions, events } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -58,6 +58,23 @@ export default async function TranscriptDetailPage({
       .where(eq(archiveAssets.id, transcript.canonicalAssetId))
       .limit(1);
     canonicalAsset = asset;
+  }
+
+  // Fetch linked event session if exists
+  let eventSession = null;
+  if (transcript.eventSessionId) {
+    const [session] = await db
+      .select({
+        id: sessions.id,
+        sessionName: sessions.sessionName,
+        eventId: sessions.eventId,
+        eventName: events.eventName,
+      })
+      .from(sessions)
+      .leftJoin(events, eq(sessions.eventId, events.id))
+      .where(eq(sessions.id, transcript.eventSessionId))
+      .limit(1);
+    eventSession = session;
   }
 
   // Fetch revision history
@@ -317,6 +334,41 @@ export default async function TranscriptDetailPage({
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No transcript file linked</p>
+            )}
+          </div>
+
+          {/* Event Session */}
+          <div className="rounded-lg border p-6">
+            <h2 className="text-lg font-semibold mb-4">Event Session</h2>
+            {eventSession ? (
+              <div className="space-y-3">
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Session</dt>
+                  <dd className="mt-0.5">
+                    <Link
+                      href={`/sessions/${eventSession.id}`}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      {eventSession.sessionName}
+                    </Link>
+                  </dd>
+                </div>
+                {eventSession.eventName && (
+                  <div>
+                    <dt className="text-xs font-medium text-muted-foreground">Event</dt>
+                    <dd className="mt-0.5">
+                      <Link
+                        href={`/events/${eventSession.eventId}`}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        {eventSession.eventName}
+                      </Link>
+                    </dd>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No event session linked</p>
             )}
           </div>
         </div>
