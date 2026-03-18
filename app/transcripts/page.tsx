@@ -17,7 +17,7 @@ export default async function TranscriptsPage({
   const search = searchParams.search || "";
   const languageFilter = searchParams.language || "";
   const kindFilter = searchParams.kind || "";
-  const statusFilter = searchParams.status || "";
+  const publicationStatusFilter = searchParams.publicationStatus || "";
   const timecodeFilter = searchParams.timecode || "";
   const sourceFilter = searchParams.source || "";
   const sortBy = searchParams.sortBy || "updatedAt";
@@ -34,8 +34,8 @@ export default async function TranscriptsPage({
   if (kindFilter) {
     conditions.push(eq(transcripts.kind, kindFilter));
   }
-  if (statusFilter) {
-    conditions.push(eq(transcripts.status, statusFilter));
+  if (publicationStatusFilter) {
+    conditions.push(eq(transcripts.publicationStatus, publicationStatusFilter));
   }
   if (timecodeFilter) {
     conditions.push(eq(transcripts.timecodeStatus, timecodeFilter));
@@ -60,8 +60,8 @@ export default async function TranscriptsPage({
         return transcripts.language;
       case "kind":
         return transcripts.kind;
-      case "status":
-        return transcripts.status;
+      case "publicationStatus":
+        return transcripts.publicationStatus;
       case "version":
         return transcripts.version;
       case "createdAt":
@@ -105,7 +105,7 @@ export default async function TranscriptsPage({
   const [languagesResult, kindsResult, statusesResult, timecodesResult, sourcesResult] = await Promise.all([
     db.selectDistinct({ value: transcripts.language }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.kind }).from(transcripts).where(isNull(transcripts.deletedAt)),
-    db.selectDistinct({ value: transcripts.status }).from(transcripts).where(isNull(transcripts.deletedAt)),
+    db.selectDistinct({ value: transcripts.publicationStatus }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.timecodeStatus }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.source }).from(transcripts).where(isNull(transcripts.deletedAt)),
   ]);

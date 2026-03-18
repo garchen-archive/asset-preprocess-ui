@@ -363,22 +363,42 @@ export default async function AssetEditPage({
 
         {/* Processing Section */}
         <div className="rounded-lg border p-6">
-          <h2 className="text-xl font-semibold mb-4">Processing</h2>
+          <h2 className="text-xl font-semibold mb-4">Processing & Publication</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="processingStatus">Processing Status</Label>
+              <p className="text-xs text-muted-foreground mb-1">Automated pipeline state</p>
               <select
                 id="processingStatus"
                 name="processingStatus"
-                defaultValue={data.processingStatus || "Raw"}
+                defaultValue={data.processingStatus || "raw"}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <option value="Raw">Raw</option>
-                <option value="Ready_for_MVP">Ready for MVP</option>
-                <option value="Needs_Work">Needs Work</option>
-                <option value="In_Progress">In Progress</option>
-                <option value="Complete">Complete</option>
-                <option value="Published">Published</option>
+                <option value="raw">Raw</option>
+                <option value="queued">Queued</option>
+                <option value="ingesting">Ingesting</option>
+                <option value="transcoded">Transcoded</option>
+                <option value="transcribing">Transcribing</option>
+                <option value="transcribed">Transcribed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+
+            <div>
+              <Label htmlFor="publicationStatus">Publication Status</Label>
+              <p className="text-xs text-muted-foreground mb-1">Editorial workflow state</p>
+              <select
+                id="publicationStatus"
+                name="publicationStatus"
+                defaultValue={data.publicationStatus || "draft"}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="draft">Draft</option>
+                <option value="in_review">In Review</option>
+                <option value="approved">Approved</option>
+                <option value="published">Published</option>
+                <option value="needs_work">Needs Work</option>
+                <option value="archived">Archived</option>
               </select>
             </div>
 

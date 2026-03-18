@@ -46,7 +46,7 @@ export default async function AssetDetailPage({
   // Use direct event if available, otherwise use event from session
   const event = directEvent || sessionEvent;
 
-  // Fetch transcripts linked to this asset (as media asset or canonical asset)
+  // Fetch transcripts linked to this asset as media asset
   const linkedTranscripts = await db
     .select()
     .from(transcripts)
@@ -54,6 +54,17 @@ export default async function AssetDetailPage({
       and(
         isNull(transcripts.deletedAt),
         eq(transcripts.mediaAssetId, params.id)
+      )
+    );
+
+  // Fetch transcripts where this asset is the canonical (transcript file)
+  const asCanonicalTranscripts = await db
+    .select()
+    .from(transcripts)
+    .where(
+      and(
+        isNull(transcripts.deletedAt),
+        eq(transcripts.canonicalAssetId, params.id)
       )
     );
 
@@ -283,11 +294,23 @@ export default async function AssetDetailPage({
           <div className="rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Transcript Records</h2>
-              <Button size="sm" variant="outline" asChild>
-                <Link href={`/transcripts/new?mediaAssetId=${params.id}`}>
-                  Add Transcript
-                </Link>
-              </Button>
+              <div className="flex gap-2">
+                {(data.assetType === "video" || data.assetType === "audio") && (
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`/transcripts/new?mediaAssetId=${params.id}`}>
+                      Add Transcript
+                    </Link>
+                  </Button>
+                )}
+                {(data.assetType === "subtitle" || data.assetType === "document" ||
+                  ["srt", "vtt", "txt", "doc", "docx", "pdf"].includes(data.fileFormat || "")) && (
+                  <Button size="sm" variant="outline" asChild>
+                    <Link href={`/transcripts/new?canonicalAssetId=${params.id}`}>
+                      Use as Transcript File
+                    </Link>
+                  </Button>
+                )}
+              </div>
             </div>
             {linkedTranscripts.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -311,16 +334,20 @@ export default async function AssetDetailPage({
                         <div className="flex items-center gap-2 mt-1">
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              tr.status === "published"
+                              tr.publicationStatus === "published"
                                 ? "bg-purple-100 text-purple-700"
-                                : tr.status === "approved"
+                                : tr.publicationStatus === "approved"
                                 ? "bg-green-100 text-green-700"
-                                : tr.status === "reviewed"
+                                : tr.publicationStatus === "in_review"
                                 ? "bg-blue-100 text-blue-700"
+                                : tr.publicationStatus === "needs_work"
+                                ? "bg-orange-100 text-orange-700"
+                                : tr.publicationStatus === "archived"
+                                ? "bg-slate-100 text-slate-700"
                                 : "bg-gray-100 text-gray-700"
                             }`}
                           >
-                            {tr.status}
+                            {tr.publicationStatus}
                           </span>
                           {tr.timecodeStatus && tr.timecodeStatus !== "none" && (
                             <span className="text-xs text-muted-foreground">
@@ -344,27 +371,105 @@ export default async function AssetDetailPage({
             )}
           </div>
 
-          {/* Processing Section */}
+          {/* Transcripts using this asset as canonical file */}
+          {asCanonicalTranscripts.length > 0 && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-xl font-semibold mb-4">Used As Transcript File</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                This asset is used as the transcript file for the following transcript records.
+              </p>
+              <div className="space-y-3">
+                {asCanonicalTranscripts.map((tr) => (
+                  <div
+                    key={tr.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <Link
+                          href={`/transcripts/${tr.id}`}
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          {tr.language.toUpperCase()} {tr.kind}
+                        </Link>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                              tr.publicationStatus === "published"
+                                ? "bg-purple-100 text-purple-700"
+                                : tr.publicationStatus === "approved"
+                                ? "bg-green-100 text-green-700"
+                                : tr.publicationStatus === "in_review"
+                                ? "bg-blue-100 text-blue-700"
+                                : tr.publicationStatus === "needs_work"
+                                ? "bg-orange-100 text-orange-700"
+                                : tr.publicationStatus === "archived"
+                                ? "bg-slate-100 text-slate-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
+                            {tr.publicationStatus}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            (canonical file)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      v{tr.version}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Processing & Publication Section */}
           <div className="rounded-lg border p-6">
-            <h2 className="text-xl font-semibold mb-4">Processing</h2>
+            <h2 className="text-xl font-semibold mb-4">Processing & Publication</h2>
             <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                <dt className="text-sm font-medium text-muted-foreground">Processing Status</dt>
                 <dd className="text-sm mt-1">
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      data.processingStatus === "Complete" || data.processingStatus === "Published"
+                      data.processingStatus === "transcribed"
                         ? "bg-green-100 text-green-700"
-                        : data.processingStatus === "In_Progress"
+                        : data.processingStatus === "transcoded"
+                        ? "bg-teal-100 text-teal-700"
+                        : data.processingStatus === "ingesting" || data.processingStatus === "transcribing"
                         ? "bg-blue-100 text-blue-700"
-                        : data.processingStatus === "Ready_for_MVP"
+                        : data.processingStatus === "queued"
                         ? "bg-purple-100 text-purple-700"
-                        : data.processingStatus === "Needs_Work"
-                        ? "bg-yellow-100 text-yellow-700"
+                        : data.processingStatus === "failed"
+                        ? "bg-red-100 text-red-700"
                         : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    {data.processingStatus?.replace(/_/g, " ") || "Raw"}
+                    {data.processingStatus || "raw"}
+                  </span>
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Publication Status</dt>
+                <dd className="text-sm mt-1">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                      data.publicationStatus === "published"
+                        ? "bg-purple-100 text-purple-700"
+                        : data.publicationStatus === "approved"
+                        ? "bg-green-100 text-green-700"
+                        : data.publicationStatus === "in_review"
+                        ? "bg-blue-100 text-blue-700"
+                        : data.publicationStatus === "needs_work"
+                        ? "bg-orange-100 text-orange-700"
+                        : data.publicationStatus === "archived"
+                        ? "bg-slate-100 text-slate-700"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {data.publicationStatus || "draft"}
                   </span>
                 </dd>
               </div>

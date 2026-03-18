@@ -13,6 +13,7 @@ export default async function AssetsPage({
   searchParams: {
     search?: string;
     status?: string;
+    publicationStatus?: string;
     type?: string;
     source?: string;
     isMediaFile?: string;
@@ -41,6 +42,13 @@ export default async function AssetsPage({
     ? statusFilterRaw
     : statusFilterRaw ? statusFilterRaw.split(',') : [];
   const statusFilter = selectedStatuses.length > 0 ? selectedStatuses.join(',') : "";
+
+  const publicationStatusFilterRaw = searchParams.publicationStatus || "";
+  const selectedPublicationStatuses = Array.isArray(publicationStatusFilterRaw)
+    ? publicationStatusFilterRaw
+    : publicationStatusFilterRaw ? publicationStatusFilterRaw.split(',') : [];
+  const publicationStatusFilter = selectedPublicationStatuses.length > 0 ? selectedPublicationStatuses.join(',') : "";
+
   const typeFilter = searchParams.type || "";
   const sourceFilter = searchParams.source || "";
   const isMediaFileFilter = searchParams.isMediaFile || "";
@@ -104,6 +112,14 @@ export default async function AssetsPage({
       return eq(archiveAssets.processingStatus, status);
     });
     conditions.push(or(...statusConditions));
+  }
+
+  // Multi-select publication status filter
+  if (selectedPublicationStatuses.length > 0) {
+    const pubStatusConditions = selectedPublicationStatuses.map(status => {
+      return eq(archiveAssets.publicationStatus, status);
+    });
+    conditions.push(or(...pubStatusConditions));
   }
 
   if (typeFilter) {
@@ -441,6 +457,7 @@ export default async function AssetsPage({
       <AssetFilters
         search={search}
         selectedStatuses={selectedStatuses}
+        selectedPublicationStatuses={selectedPublicationStatuses}
         typeFilter={typeFilter}
         sourceFilter={sourceFilter}
         isMediaFileFilter={isMediaFileFilter}

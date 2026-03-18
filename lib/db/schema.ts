@@ -72,7 +72,8 @@ export const asset = pgTable("asset", {
   // Note: teaching segments now stored in additional_metadata as teaching_segments array
 
   // PROCESSING FIELDS
-  processingStatus: text("processing_status").default("Raw"), // Raw, Ready_for_MVP, Needs_Work, In_Progress, Complete, Published
+  processingStatus: text("processing_status").default("raw"), // raw, queued, ingesting, transcoded, transcribing, transcribed, failed
+  publicationStatus: text("publication_status").notNull().default("draft"), // draft, in_review, approved, published, needs_work, archived
   needsDetailedReview: boolean("needs_detailed_review").default(false),
 
   // 5. ADMINISTRATIVE
@@ -169,6 +170,7 @@ export const event = pgTable("event", {
   eventDescription: text("event_description"),
   totalDuration: text("total_duration"),
   catalogingStatus: text("cataloging_status"),
+  publicationStatus: text("publication_status").notNull().default("draft"), // draft, in_review, approved, published, needs_work, archived
   notes: text("notes"),
   harvestSource: text("harvest_source"),
   lastHarvestedAt: timestamp("last_harvested_at"),
@@ -211,6 +213,7 @@ export const eventSession = pgTable("event_session", {
   assetCount: integer("asset_count").default(0),
   hasAssets: boolean("has_assets").default(false),
   catalogingStatus: text("cataloging_status"),
+  publicationStatus: text("publication_status").notNull().default("draft"), // draft, in_review, approved, published, needs_work, archived
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -547,8 +550,10 @@ export const transcript = pgTable("transcript", {
   eventSessionId: uuid("event_session_id").references(() => eventSession.id, { onDelete: "cascade" }),
   eventSessionAssetId: uuid("event_session_asset_id").references(() => eventSessionAsset.id, { onDelete: "set null" }),
 
-  // Asset-level references (existing)
-  mediaAssetId: uuid("media_asset_id").notNull().references(() => asset.id, { onDelete: "cascade" }),
+  // Asset-level references
+  // mediaAssetId: Only set when timing is aligned to a specific file variant (e.g., ASR from Camera A)
+  mediaAssetId: uuid("media_asset_id").references(() => asset.id, { onDelete: "set null" }),
+  // canonicalAssetId: The transcript file (SRT, VTT, document)
   canonicalAssetId: uuid("canonical_asset_id").references(() => asset.id, { onDelete: "set null" }),
 
   // Language & Type
@@ -563,7 +568,7 @@ export const transcript = pgTable("transcript", {
   source: text("source"),                                    // asr, human, hybrid
 
   // Workflow
-  status: text("status").notNull().default("draft"),         // draft, reviewed, approved, published
+  publicationStatus: text("publication_status").notNull().default("draft"), // draft, in_review, approved, published, needs_work, archived
   version: integer("version").notNull().default(1),
 
   // Attribution

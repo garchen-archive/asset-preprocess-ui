@@ -12,12 +12,22 @@ interface BulkEditModalProps {
 }
 
 const PROCESSING_STATUS_OPTIONS = [
-  { value: "Raw", label: "Raw" },
-  { value: "Ready_for_MVP", label: "Ready for MVP" },
-  { value: "Needs_Work", label: "Needs Work" },
-  { value: "In_Progress", label: "In Progress" },
-  { value: "Complete", label: "Complete" },
-  { value: "Published", label: "Published" },
+  { value: "raw", label: "Raw" },
+  { value: "queued", label: "Queued" },
+  { value: "ingesting", label: "Ingesting" },
+  { value: "transcoded", label: "Transcoded" },
+  { value: "transcribing", label: "Transcribing" },
+  { value: "transcribed", label: "Transcribed" },
+  { value: "failed", label: "Failed" },
+];
+
+const PUBLICATION_STATUS_OPTIONS = [
+  { value: "draft", label: "Draft" },
+  { value: "in_review", label: "In Review" },
+  { value: "approved", label: "Approved" },
+  { value: "published", label: "Published" },
+  { value: "needs_work", label: "Needs Work" },
+  { value: "archived", label: "Archived" },
 ];
 
 const TRANSCRIPT_TIMESTAMPED_OPTIONS = [
@@ -65,7 +75,8 @@ export function BulkEditModal({
   const [oralTranslationLanguages, setOralTranslationLanguages] = useState<string[]>([]);
   const [interpreterName, setInterpreterName] = useState("");
   const [contributorOrg, setContributorOrg] = useState("");
-  const [processingStatus, setProcessingStatus] = useState("Raw");
+  const [processingStatus, setProcessingStatus] = useState("raw");
+  const [publicationStatus, setPublicationStatus] = useState("draft");
   const [needsDetailedReview, setNeedsDetailedReview] = useState(false);
   const [transcriptAvailable, setTranscriptAvailable] = useState(false);
   const [transcriptTimestamped, setTranscriptTimestamped] = useState("No");
@@ -102,6 +113,7 @@ export function BulkEditModal({
       if (enabledFields.interpreterName) updates.interpreterName = interpreterName || null;
       if (enabledFields.contributorOrg) updates.contributorOrg = contributorOrg || null;
       if (enabledFields.processingStatus) updates.processingStatus = processingStatus;
+      if (enabledFields.publicationStatus) updates.publicationStatus = publicationStatus;
       if (enabledFields.needsDetailedReview) updates.needsDetailedReview = needsDetailedReview;
       if (enabledFields.transcriptAvailable) updates.transcriptAvailable = transcriptAvailable;
       if (enabledFields.transcriptTimestamped) updates.transcriptTimestamped = transcriptTimestamped;
@@ -278,9 +290,9 @@ export function BulkEditModal({
             </FieldRow>
           </div>
 
-          {/* Processing Section */}
+          {/* Processing & Publication Section */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Processing</h3>
+            <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Processing & Publication</h3>
 
             <FieldRow
               label="Processing Status"
@@ -294,6 +306,23 @@ export function BulkEditModal({
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
               >
                 {PROCESSING_STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </FieldRow>
+
+            <FieldRow
+              label="Publication Status"
+              enabled={enabledFields.publicationStatus}
+              onToggle={() => toggleField("publicationStatus")}
+            >
+              <select
+                value={publicationStatus}
+                onChange={(e) => setPublicationStatus(e.target.value)}
+                disabled={!enabledFields.publicationStatus}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-50"
+              >
+                {PUBLICATION_STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>

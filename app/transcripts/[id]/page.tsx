@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { transcripts, transcriptRevisions, archiveAssets, sessions, events } from "@/lib/db/schema";
+import { transcripts, transcriptRevisions, archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -20,11 +20,13 @@ const LANGUAGE_LABELS: Record<string, string> = {
   multi: "Multi-language",
 };
 
-const STATUS_COLORS: Record<string, string> = {
+const PUBLICATION_STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
-  reviewed: "bg-blue-100 text-blue-700",
+  in_review: "bg-blue-100 text-blue-700",
   approved: "bg-green-100 text-green-700",
   published: "bg-purple-100 text-purple-700",
+  needs_work: "bg-orange-100 text-orange-700",
+  archived: "bg-slate-100 text-slate-700",
 };
 
 export default async function TranscriptDetailPage({
@@ -77,6 +79,25 @@ export default async function TranscriptDetailPage({
     eventSession = session;
   }
 
+  // Fetch linked event session asset if exists
+  let sessionAsset = null;
+  if (transcript.eventSessionAssetId) {
+    const [esa] = await db
+      .select({
+        id: eventSessionAsset.id,
+        variantType: eventSessionAsset.variantType,
+        variantLabel: eventSessionAsset.variantLabel,
+        assetId: eventSessionAsset.assetId,
+        assetName: asset.name,
+        assetTitle: asset.title,
+      })
+      .from(eventSessionAsset)
+      .leftJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+      .where(eq(eventSessionAsset.id, transcript.eventSessionAssetId))
+      .limit(1);
+    sessionAsset = esa;
+  }
+
   // Fetch revision history
   const revisions = await db
     .select()
@@ -126,13 +147,13 @@ export default async function TranscriptDetailPage({
           {/* Status & Version */}
           <div className="rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Status</h2>
+              <h2 className="text-xl font-semibold">Publication Status</h2>
               <span
                 className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${
-                  STATUS_COLORS[transcript.status] || "bg-gray-100 text-gray-700"
+                  PUBLICATION_STATUS_COLORS[transcript.publicationStatus] || "bg-gray-100 text-gray-700"
                 }`}
               >
-                {transcript.status}
+                {transcript.publicationStatus}
               </span>
             </div>
             <dl className="grid grid-cols-2 gap-4 text-sm">
@@ -257,7 +278,7 @@ export default async function TranscriptDetailPage({
                       {rev.statusSnapshot && (
                         <span
                           className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium mt-2 ${
-                            STATUS_COLORS[rev.statusSnapshot] || "bg-gray-100 text-gray-700"
+                            PUBLICATION_STATUS_COLORS[rev.statusSnapshot] || "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {rev.statusSnapshot}
@@ -273,39 +294,9 @@ export default async function TranscriptDetailPage({
 
         {/* Sidebar - Linked Assets */}
         <div className="space-y-6">
-          {/* Media Asset */}
-          <div className="rounded-lg border p-6">
-            <h2 className="text-lg font-semibold mb-4">Media Asset</h2>
-            {mediaAsset ? (
-              <div className="space-y-3">
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Name</dt>
-                  <dd className="mt-0.5">
-                    <Link
-                      href={`/assets/${mediaAsset.id}`}
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      {mediaAsset.title || mediaAsset.name}
-                    </Link>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Type</dt>
-                  <dd className="mt-0.5 text-sm capitalize">{mediaAsset.assetType || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-muted-foreground">Duration</dt>
-                  <dd className="mt-0.5 text-sm">{mediaAsset.duration || "—"}</dd>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Asset not found</p>
-            )}
-          </div>
-
           {/* Canonical Asset (Transcript File) */}
           <div className="rounded-lg border p-6">
-            <h2 className="text-lg font-semibold mb-4">Transcript File</h2>
+            <h2 className="text-lg font-semibold mb-4">Canonical Asset</h2>
             {canonicalAsset ? (
               <div className="space-y-3">
                 <div>
@@ -371,6 +362,59 @@ export default async function TranscriptDetailPage({
               <p className="text-sm text-muted-foreground">No event session linked</p>
             )}
           </div>
+
+          {/* Event Session Asset */}
+          {sessionAsset && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-lg font-semibold mb-4">Event Session Asset</h2>
+              <div className="space-y-3">
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Variant</dt>
+                  <dd className="mt-0.5 text-sm capitalize">
+                    {sessionAsset.variantLabel || sessionAsset.variantType}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Asset</dt>
+                  <dd className="mt-0.5">
+                    <Link
+                      href={`/assets/${sessionAsset.assetId}`}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      {sessionAsset.assetTitle || sessionAsset.assetName}
+                    </Link>
+                  </dd>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Media Asset (variant-specific timing) */}
+          {mediaAsset && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-lg font-semibold mb-4">Media Asset</h2>
+              <p className="text-xs text-muted-foreground mb-3">
+                Transcript timing aligned to this specific file.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Name</dt>
+                  <dd className="mt-0.5">
+                    <Link
+                      href={`/assets/${mediaAsset.id}`}
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      {mediaAsset.title || mediaAsset.name}
+                    </Link>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Type</dt>
+                  <dd className="mt-0.5 text-sm capitalize">{mediaAsset.assetType || "—"}</dd>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -49,7 +49,8 @@ export async function updateAsset(id: string, formData: FormData) {
     transcriptLocation: formData.get("transcriptLocation") as string || null,
 
     // Processing
-    processingStatus: formData.get("processingStatus") as string || "Raw",
+    processingStatus: formData.get("processingStatus") as string || "raw",
+    publicationStatus: formData.get("publicationStatus") as string || "draft",
     needsDetailedReview: formData.get("needsDetailedReview") === "on",
 
     // Quality
@@ -1481,7 +1482,7 @@ export async function importOrganizationsFromCSV(rows: CSVRow[]) {
 
 export async function createTranscript(formData: FormData) {
   const data = {
-    mediaAssetId: formData.get("mediaAssetId") as string,
+    mediaAssetId: (formData.get("mediaAssetId") as string) || null,
     canonicalAssetId: (formData.get("canonicalAssetId") as string) || null,
     eventSessionId: (formData.get("eventSessionId") as string) || null,
     eventSessionAssetId: (formData.get("eventSessionAssetId") as string) || null,
@@ -1492,7 +1493,7 @@ export async function createTranscript(formData: FormData) {
     translationOf: (formData.get("translationOf") as string) || null,
     timecodeStatus: (formData.get("timecodeStatus") as string) || "none",
     source: (formData.get("source") as string) || null,
-    status: (formData.get("status") as string) || "draft",
+    publicationStatus: (formData.get("publicationStatus") as string) || "draft",
     createdBy: (formData.get("createdBy") as string) || null,
     notes: (formData.get("notes") as string) || null,
   };
@@ -1506,7 +1507,7 @@ export async function createTranscript(formData: FormData) {
     versionNumber: 1,
     editedBy: data.createdBy,
     changeNote: "Initial creation",
-    statusSnapshot: data.status,
+    statusSnapshot: data.publicationStatus,
   });
 
   revalidatePath("/transcripts");
@@ -1538,7 +1539,7 @@ export async function updateTranscript(id: string, formData: FormData) {
     translationOf: (formData.get("translationOf") as string) || null,
     timecodeStatus: (formData.get("timecodeStatus") as string) || "none",
     source: (formData.get("source") as string) || null,
-    status: formData.get("status") as string,
+    publicationStatus: formData.get("publicationStatus") as string,
     version: newVersion,
     editedBy,
     notes: (formData.get("notes") as string) || null,
@@ -1554,7 +1555,7 @@ export async function updateTranscript(id: string, formData: FormData) {
     versionNumber: newVersion,
     editedBy,
     changeNote,
-    statusSnapshot: data.status,
+    statusSnapshot: data.publicationStatus,
   });
 
   revalidatePath(`/transcripts/${id}`);

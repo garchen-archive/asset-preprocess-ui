@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { archiveAssets, sessions, events } from "@/lib/db/schema";
+import { archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib/db/schema";
 import { or, eq, inArray, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function NewTranscriptPage({
   searchParams,
 }: {
-  searchParams: { mediaAssetId?: string };
+  searchParams: { mediaAssetId?: string; canonicalAssetId?: string };
 }) {
   // Fetch media assets (video/audio)
   const mediaAssets = await db
@@ -62,6 +62,21 @@ export default async function NewTranscriptPage({
     .orderBy(sessions.sessionName)
     .limit(1000);
 
+  // Fetch event session assets (media variants)
+  const sessionAssets = await db
+    .select({
+      id: eventSessionAsset.id,
+      eventSessionId: eventSessionAsset.eventSessionId,
+      assetId: eventSessionAsset.assetId,
+      assetName: asset.name,
+      assetTitle: asset.title,
+      variantType: eventSessionAsset.variantType,
+      variantLabel: eventSessionAsset.variantLabel,
+    })
+    .from(eventSessionAsset)
+    .leftJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+    .limit(2000);
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -84,7 +99,9 @@ export default async function NewTranscriptPage({
         mediaAssets={mediaAssets}
         transcriptAssets={transcriptAssets}
         eventSessions={eventSessions}
+        eventSessionAssets={sessionAssets}
         defaultMediaAssetId={searchParams.mediaAssetId}
+        defaultCanonicalAssetId={searchParams.canonicalAssetId}
         cancelHref="/transcripts"
       />
     </div>
