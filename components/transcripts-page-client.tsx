@@ -10,7 +10,7 @@ import { bulkUpdateTranscripts, bulkDeleteTranscripts } from "@/lib/actions";
 type TranscriptWithAsset = {
   transcript: {
     id: string;
-    mediaAssetId: string;
+    mediaAssetId: string | null;
     canonicalAssetId: string | null;
     language: string;
     kind: string;
@@ -19,7 +19,7 @@ type TranscriptWithAsset = {
     translationOf: string | null;
     timecodeStatus: string | null;
     source: string | null;
-    status: string;
+    publicationStatus: string;
     version: number;
     createdBy: string | null;
     editedBy: string | null;
@@ -49,11 +49,13 @@ type TranscriptsPageClientProps = {
   searchParams: Record<string, string | undefined>;
 };
 
-const STATUS_COLORS: Record<string, string> = {
+const PUBLICATION_STATUS_COLORS: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700",
-  reviewed: "bg-blue-100 text-blue-700",
+  in_review: "bg-blue-100 text-blue-700",
   approved: "bg-green-100 text-green-700",
   published: "bg-purple-100 text-purple-700",
+  needs_work: "bg-orange-100 text-orange-700",
+  archived: "bg-slate-100 text-slate-700",
 };
 
 const LANGUAGE_LABELS: Record<string, string> = {
@@ -205,13 +207,13 @@ export function TranscriptsPageClient({
             </select>
           </div>
 
-          {/* Status */}
+          {/* Publication Status */}
           <div>
-            <label className="text-xs font-medium mb-1 block">Status</label>
+            <label className="text-xs font-medium mb-1 block">Publication Status</label>
             <select
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              value={searchParams.status || ""}
-              onChange={(e) => handleFilterChange("status", e.target.value)}
+              value={searchParams.publicationStatus || ""}
+              onChange={(e) => handleFilterChange("publicationStatus", e.target.value)}
             >
               <option value="">All</option>
               {statuses.map((status) => (
@@ -284,9 +286,11 @@ export function TranscriptsPageClient({
               >
                 <option value="">Set Status...</option>
                 <option value="draft">Draft</option>
-                <option value="reviewed">Reviewed</option>
+                <option value="in_review">In Review</option>
                 <option value="approved">Approved</option>
                 <option value="published">Published</option>
+                <option value="needs_work">Needs Work</option>
+                <option value="archived">Archived</option>
               </select>
               <Button
                 variant="destructive"
@@ -362,10 +366,10 @@ export function TranscriptsPageClient({
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                        STATUS_COLORS[transcript.status] || "bg-gray-100 text-gray-700"
+                        PUBLICATION_STATUS_COLORS[transcript.publicationStatus] || "bg-gray-100 text-gray-700"
                       }`}
                     >
-                      {transcript.status}
+                      {transcript.publicationStatus}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm capitalize">

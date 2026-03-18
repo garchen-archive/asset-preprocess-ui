@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 interface AssetFiltersProps {
   search: string;
   selectedStatuses: string[];
+  selectedPublicationStatuses: string[];
   typeFilter: string;
   sourceFilter: string;
   isMediaFileFilter: string;
@@ -32,12 +33,22 @@ interface AssetFiltersProps {
 }
 
 const PROCESSING_STATUS_OPTIONS = [
-  { value: "Raw", label: "Raw" },
-  { value: "Ready_for_MVP", label: "Ready for MVP" },
-  { value: "Needs_Work", label: "Needs Work" },
-  { value: "In_Progress", label: "In Progress" },
-  { value: "Complete", label: "Complete" },
-  { value: "Published", label: "Published" },
+  { value: "raw", label: "Raw" },
+  { value: "queued", label: "Queued" },
+  { value: "ingesting", label: "Ingesting" },
+  { value: "transcoded", label: "Transcoded" },
+  { value: "transcribing", label: "Transcribing" },
+  { value: "transcribed", label: "Transcribed" },
+  { value: "failed", label: "Failed" },
+];
+
+const PUBLICATION_STATUS_OPTIONS = [
+  { value: "draft", label: "Draft" },
+  { value: "in_review", label: "In Review" },
+  { value: "approved", label: "Approved" },
+  { value: "published", label: "Published" },
+  { value: "needs_work", label: "Needs Work" },
+  { value: "archived", label: "Archived" },
 ];
 
 const TRANSCRIPT_LANGUAGE_OPTIONS = [
@@ -55,6 +66,7 @@ const TRANSCRIPT_LANGUAGE_OPTIONS = [
 export function AssetFilters({
   search,
   selectedStatuses,
+  selectedPublicationStatuses,
   typeFilter,
   sourceFilter,
   isMediaFileFilter,
@@ -76,7 +88,7 @@ export function AssetFilters({
 }: AssetFiltersProps) {
   // Count active filters for badges
   const dateFilterCount = (dateSearchFilter ? 1 : 0) + (dateFromFilter ? 1 : 0) + (dateToFilter ? 1 : 0);
-  const processingFilterCount = selectedStatuses.length + (needsDetailedReviewFilter ? 1 : 0);
+  const processingFilterCount = selectedStatuses.length + selectedPublicationStatuses.length + (needsDetailedReviewFilter ? 1 : 0);
   const transcriptFilterCount =
     selectedTranscriptLangs.length +
     (hasTimestampedTranscriptFilter ? 1 : 0) +
@@ -94,6 +106,7 @@ export function AssetFilters({
   const hasActiveFilters =
     search ||
     selectedStatuses.length > 0 ||
+    selectedPublicationStatuses.length > 0 ||
     typeFilter ||
     sourceFilter ||
     isMediaFileFilter ||
@@ -192,18 +205,25 @@ export function AssetFilters({
         </div>
       </CollapsibleFilterSection>
 
-      {/* Processing Filters */}
+      {/* Processing & Publication Filters */}
       <CollapsibleFilterSection
-        title="Processing"
+        title="Processing & Publication"
         badge={processingFilterCount}
         defaultOpen={processingFilterCount > 0}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FilterMultiSelect
             name="status"
             label="Processing Status"
             options={PROCESSING_STATUS_OPTIONS}
             selectedValues={selectedStatuses}
+            placeholder="Select statuses..."
+          />
+          <FilterMultiSelect
+            name="publicationStatus"
+            label="Publication Status"
+            options={PUBLICATION_STATUS_OPTIONS}
+            selectedValues={selectedPublicationStatuses}
             placeholder="Select statuses..."
           />
           <div>

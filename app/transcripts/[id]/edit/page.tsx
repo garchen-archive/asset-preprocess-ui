@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { transcripts, archiveAssets, sessions, events } from "@/lib/db/schema";
+import { transcripts, archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib/db/schema";
 import { eq, or, inArray, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -23,17 +23,21 @@ export default async function EditTranscriptPage({
     notFound();
   }
 
-  // Fetch media asset info
-  const [mediaAsset] = await db
-    .select({
-      id: archiveAssets.id,
-      name: archiveAssets.name,
-      title: archiveAssets.title,
-      assetType: archiveAssets.assetType,
-    })
-    .from(archiveAssets)
-    .where(eq(archiveAssets.id, transcript.mediaAssetId))
-    .limit(1);
+  // Fetch media asset info (if set)
+  let mediaAsset = null;
+  if (transcript.mediaAssetId) {
+    const [asset] = await db
+      .select({
+        id: archiveAssets.id,
+        name: archiveAssets.name,
+        title: archiveAssets.title,
+        assetType: archiveAssets.assetType,
+      })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.id, transcript.mediaAssetId))
+      .limit(1);
+    mediaAsset = asset || null;
+  }
 
   // Fetch transcript file assets (subtitle/document)
   const transcriptAssets = await db
@@ -68,6 +72,21 @@ export default async function EditTranscriptPage({
     .orderBy(sessions.sessionName)
     .limit(1000);
 
+  // Fetch event session assets (media variants)
+  const sessionAssets = await db
+    .select({
+      id: eventSessionAsset.id,
+      eventSessionId: eventSessionAsset.eventSessionId,
+      assetId: eventSessionAsset.assetId,
+      assetName: asset.name,
+      assetTitle: asset.title,
+      variantType: eventSessionAsset.variantType,
+      variantLabel: eventSessionAsset.variantLabel,
+    })
+    .from(eventSessionAsset)
+    .leftJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+    .limit(2000);
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Header */}
@@ -92,6 +111,7 @@ export default async function EditTranscriptPage({
         mediaAssets={[]}
         transcriptAssets={transcriptAssets}
         eventSessions={eventSessions}
+        eventSessionAssets={sessionAssets}
         linkedMediaAsset={mediaAsset}
         cancelHref={`/transcripts/${params.id}`}
       />

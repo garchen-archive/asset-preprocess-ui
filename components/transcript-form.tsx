@@ -48,11 +48,13 @@ const SOURCE_OPTIONS = [
   { value: "hybrid", label: "Hybrid" },
 ];
 
-const STATUS_OPTIONS = [
+const PUBLICATION_STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
-  { value: "reviewed", label: "Reviewed" },
+  { value: "in_review", label: "In Review" },
   { value: "approved", label: "Approved" },
   { value: "published", label: "Published" },
+  { value: "needs_work", label: "Needs Work" },
+  { value: "archived", label: "Archived" },
 ];
 
 type MediaAsset = {
@@ -76,9 +78,19 @@ type EventSessionOption = {
   eventName?: string | null;
 };
 
+type EventSessionAssetOption = {
+  id: string;
+  eventSessionId: string;
+  assetId: string;
+  assetName: string | null;
+  assetTitle: string | null;
+  variantType: string;
+  variantLabel: string | null;
+};
+
 type TranscriptData = {
   id: string;
-  mediaAssetId: string;
+  mediaAssetId: string | null;
   canonicalAssetId: string | null;
   eventSessionId: string | null;
   eventSessionAssetId: string | null;
@@ -89,7 +101,7 @@ type TranscriptData = {
   translationOf: string | null;
   timecodeStatus: string | null;
   source: string | null;
-  status: string;
+  publicationStatus: string;
   version: number;
   createdBy: string | null;
   editedBy: string | null;
@@ -103,8 +115,10 @@ interface TranscriptFormProps {
   mediaAssets: MediaAsset[];
   transcriptAssets: TranscriptAsset[];
   eventSessions?: EventSessionOption[];
+  eventSessionAssets?: EventSessionAssetOption[];
   linkedMediaAsset?: MediaAsset | null;
   defaultMediaAssetId?: string;
+  defaultCanonicalAssetId?: string;
   cancelHref: string;
 }
 
@@ -114,8 +128,10 @@ export function TranscriptForm({
   mediaAssets,
   transcriptAssets,
   eventSessions = [],
+  eventSessionAssets = [],
   linkedMediaAsset,
   defaultMediaAssetId,
+  defaultCanonicalAssetId,
   cancelHref,
 }: TranscriptFormProps) {
   const router = useRouter();
@@ -126,10 +142,13 @@ export function TranscriptForm({
     transcript?.mediaAssetId || defaultMediaAssetId || ""
   );
   const [canonicalAssetId, setCanonicalAssetId] = useState(
-    transcript?.canonicalAssetId || ""
+    transcript?.canonicalAssetId || defaultCanonicalAssetId || ""
   );
   const [eventSessionId, setEventSessionId] = useState(
     transcript?.eventSessionId || ""
+  );
+  const [eventSessionAssetId, setEventSessionAssetId] = useState(
+    transcript?.eventSessionAssetId || ""
   );
   const [language, setLanguage] = useState(transcript?.language || "en");
   const [kind, setKind] = useState(transcript?.kind || "transcript");
@@ -138,7 +157,7 @@ export function TranscriptForm({
   const [translationOf, setTranslationOf] = useState(transcript?.translationOf || "");
   const [timecodeStatus, setTimecodeStatus] = useState(transcript?.timecodeStatus || "none");
   const [source, setSource] = useState(transcript?.source || "");
-  const [status, setStatus] = useState(transcript?.status || "draft");
+  const [publicationStatus, setPublicationStatus] = useState(transcript?.publicationStatus || "draft");
   const [editedBy, setEditedBy] = useState(transcript?.editedBy || "");
   const [createdBy, setCreatedBy] = useState(transcript?.createdBy || "");
   const [notes, setNotes] = useState(transcript?.notes || "");
@@ -162,6 +181,23 @@ export function TranscriptForm({
       : session.sessionName,
   }));
 
+  // Filter session assets based on selected session
+  const filteredSessionAssets = eventSessionAssets
+    .filter((sa) => sa.eventSessionId === eventSessionId)
+    .map((sa) => ({
+      value: sa.id,
+      label: `${sa.assetTitle || sa.assetName || "Unknown"} - ${sa.variantLabel || sa.variantType}`,
+    }));
+
+  // Handle session change - clear session asset when session changes
+  const handleSessionChange = (newSessionId: string) => {
+    setEventSessionId(newSessionId);
+    // Clear session asset if it doesn't belong to the new session
+    if (newSessionId !== eventSessionId) {
+      setEventSessionAssetId("");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -170,6 +206,7 @@ export function TranscriptForm({
     formData.set("mediaAssetId", mediaAssetId);
     formData.set("canonicalAssetId", canonicalAssetId);
     formData.set("eventSessionId", eventSessionId);
+    formData.set("eventSessionAssetId", eventSessionAssetId);
     formData.set("language", language);
     formData.set("kind", kind);
     formData.set("spokenSource", spokenSource);
@@ -177,7 +214,7 @@ export function TranscriptForm({
     formData.set("translationOf", translationOf);
     formData.set("timecodeStatus", timecodeStatus);
     formData.set("source", source);
-    formData.set("status", status);
+    formData.set("publicationStatus", publicationStatus);
     formData.set("notes", notes);
 
     if (mode === "create") {
@@ -192,70 +229,77 @@ export function TranscriptForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Media Asset Selection */}
+      {/* Session Association */}
       <div className="rounded-lg border p-6">
-        <h2 className="text-xl font-semibold mb-4">Media Asset</h2>
+        <h2 className="text-xl font-semibold mb-4">Session</h2>
         <div className="space-y-4">
-          {mode === "edit" && linkedMediaAsset ? (
+          <div>
+            <Label htmlFor="eventSessionId">Event Session *</Label>
+            <SearchableSelect
+              options={eventSessionOptions}
+              value={eventSessionId}
+              onChange={handleSessionChange}
+              placeholder="Search event sessions..."
+              name="eventSessionId"
+              emptyLabel="Select session..."
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              The event session this transcript belongs to.
+            </p>
+          </div>
+
+          {/* Event Session Asset - only shown when session is selected and has assets */}
+          {eventSessionId && filteredSessionAssets.length > 0 && (
             <div>
-              <Label className="text-muted-foreground">Linked Media Asset</Label>
-              <p className="text-sm font-medium">
-                <Link
-                  href={`/assets/${linkedMediaAsset.id}`}
-                  className="text-blue-600 hover:underline"
-                >
-                  {linkedMediaAsset.title || linkedMediaAsset.name} ({linkedMediaAsset.assetType})
-                </Link>
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Media asset cannot be changed after creation.
-              </p>
-              <input type="hidden" name="mediaAssetId" value={mediaAssetId} />
-            </div>
-          ) : (
-            <div>
-              <Label htmlFor="mediaAssetId">Media Asset (Video/Audio) *</Label>
+              <Label htmlFor="eventSessionAssetId">Event Session Asset</Label>
               <SearchableSelect
-                options={mediaAssetOptions}
-                value={mediaAssetId}
-                onChange={setMediaAssetId}
-                placeholder="Search media assets..."
-                name="mediaAssetId"
-                emptyLabel="Select media asset..."
+                options={filteredSessionAssets}
+                value={eventSessionAssetId}
+                onChange={setEventSessionAssetId}
+                placeholder="Select specific variant..."
+                name="eventSessionAssetId"
+                emptyLabel="None (applies to all variants)"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                The video or audio asset this transcript is for.
+                Optional. Select if this transcript aligns to a specific variant (e.g., Camera A, edited cut).
               </p>
             </div>
           )}
+        </div>
+      </div>
 
+      {/* Assets */}
+      <div className="rounded-lg border p-6">
+        <h2 className="text-xl font-semibold mb-4">Assets</h2>
+        <div className="space-y-4">
           <div>
-            <Label htmlFor="canonicalAssetId">Transcript File (Optional)</Label>
+            <Label htmlFor="canonicalAssetId">Canonical Asset</Label>
             <SearchableSelect
               options={transcriptAssetOptions}
               value={canonicalAssetId}
               onChange={setCanonicalAssetId}
               placeholder="Search transcript files..."
               name="canonicalAssetId"
-              emptyLabel="No file linked"
+              emptyLabel="None"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              The SRT, VTT, or document file containing the transcript text.
+              The subtitle or document asset containing the transcript text (SRT, VTT, TXT, DOCX, etc.).
             </p>
           </div>
 
           <div>
-            <Label htmlFor="eventSessionId">Event Session (Optional)</Label>
+            <Label htmlFor="mediaAssetId">Media Asset</Label>
             <SearchableSelect
-              options={eventSessionOptions}
-              value={eventSessionId}
-              onChange={setEventSessionId}
-              placeholder="Search event sessions..."
-              name="eventSessionId"
-              emptyLabel="No session linked"
+              options={mediaAssetOptions}
+              value={mediaAssetId}
+              onChange={setMediaAssetId}
+              placeholder="Search media assets..."
+              name="mediaAssetId"
+              emptyLabel="None"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Link this transcript to a specific event session.
+              Optional. Only populate when transcript timing is aligned to a specific file variant
+              (e.g., ASR generated from Camera A only, or timing drift exists between variants).
             </p>
           </div>
         </div>
@@ -415,16 +459,16 @@ export function TranscriptForm({
         <h2 className="text-xl font-semibold mb-4">Workflow</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="status">{mode === "create" ? "Initial Status" : "Status *"}</Label>
+            <Label htmlFor="publicationStatus">{mode === "create" ? "Initial Status" : "Publication Status *"}</Label>
             <select
-              id="status"
-              name="status"
+              id="publicationStatus"
+              name="publicationStatus"
               required={mode === "edit"}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
+              value={publicationStatus}
+              onChange={(e) => setPublicationStatus(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              {STATUS_OPTIONS.map((opt) => (
+              {PUBLICATION_STATUS_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
                 </option>
