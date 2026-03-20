@@ -25,16 +25,21 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
   );
 
   // Group categories by type
-  const categoriesByType = useMemo(() => {
+  const { categoriesByType, otherCategories } = useMemo(() => {
     const grouped = new Map<string, Category[]>();
     CATEGORY_TYPES.forEach(type => grouped.set(type, []));
+    const other: Category[] = [];
 
     categories.forEach(category => {
-      const existing = grouped.get(category.type) || [];
-      grouped.set(category.type, [...existing, category]);
+      if (CATEGORY_TYPES.includes(category.type as CategoryType)) {
+        const existing = grouped.get(category.type) || [];
+        grouped.set(category.type, [...existing, category]);
+      } else {
+        other.push(category);
+      }
     });
 
-    return grouped;
+    return { categoriesByType: grouped, otherCategories: other };
   }, [categories]);
 
   const toggleType = (type: string) => {
@@ -271,6 +276,96 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
                 </div>
               );
             })}
+
+            {/* Other categories (imported, etc.) */}
+            {otherCategories.length > 0 && (
+              <div className="border-b last:border-b-0">
+                <button
+                  onClick={() => toggleType("Other")}
+                  className="w-full p-4 flex items-center gap-2 hover:bg-muted/30 transition-colors"
+                >
+                  {expandedTypes.has("Other") ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="font-semibold">Other</span>
+                  <Badge variant="outline" className="ml-auto">
+                    {otherCategories.length}
+                  </Badge>
+                </button>
+
+                {expandedTypes.has("Other") && (
+                  <div className="bg-muted/20">
+                    {otherCategories.map((category) => (
+                      <div
+                        key={category.id}
+                        className="p-3 pl-10 flex items-center gap-3 hover:bg-muted/40 border-t first:border-t-0"
+                      >
+                        {editingId === category.id ? (
+                          <>
+                            <Input
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleUpdate(category.id);
+                                } else if (e.key === "Escape") {
+                                  cancelEdit();
+                                }
+                              }}
+                              className="flex-1"
+                              autoFocus
+                            />
+                            <select
+                              value={editingType}
+                              onChange={(e) => setEditingType(e.target.value as CategoryType)}
+                              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[160px]"
+                            >
+                              {CATEGORY_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdate(category.id)}
+                              disabled={!editingName.trim()}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex-1 text-sm font-medium">{category.name}</div>
+                            <Badge variant="outline" className="text-xs">
+                              {category.type}
+                            </Badge>
+                            <Button variant="ghost" size="sm" onClick={() => startEdit(category)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(category.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

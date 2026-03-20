@@ -25,16 +25,21 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
   );
 
   // Group topics by type
-  const topicsByType = useMemo(() => {
+  const { topicsByType, otherTopics } = useMemo(() => {
     const grouped = new Map<string, Topic[]>();
     TOPIC_TYPES.forEach(type => grouped.set(type, []));
+    const other: Topic[] = [];
 
     topics.forEach(topic => {
-      const existing = grouped.get(topic.type) || [];
-      grouped.set(topic.type, [...existing, topic]);
+      if (TOPIC_TYPES.includes(topic.type as TopicType)) {
+        const existing = grouped.get(topic.type) || [];
+        grouped.set(topic.type, [...existing, topic]);
+      } else {
+        other.push(topic);
+      }
     });
 
-    return grouped;
+    return { topicsByType: grouped, otherTopics: other };
   }, [topics]);
 
   const toggleType = (type: string) => {
@@ -271,6 +276,96 @@ export function TopicsManager({ initialTopics }: TopicsManagerProps) {
                 </div>
               );
             })}
+
+            {/* Other topics (imported, etc.) */}
+            {otherTopics.length > 0 && (
+              <div className="border-b last:border-b-0">
+                <button
+                  onClick={() => toggleType("Other")}
+                  className="w-full p-4 flex items-center gap-2 hover:bg-muted/30 transition-colors"
+                >
+                  {expandedTypes.has("Other") ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <span className="font-semibold">Other</span>
+                  <Badge variant="outline" className="ml-auto">
+                    {otherTopics.length}
+                  </Badge>
+                </button>
+
+                {expandedTypes.has("Other") && (
+                  <div className="bg-muted/20">
+                    {otherTopics.map((topic) => (
+                      <div
+                        key={topic.id}
+                        className="p-3 pl-10 flex items-center gap-3 hover:bg-muted/40 border-t first:border-t-0"
+                      >
+                        {editingId === topic.id ? (
+                          <>
+                            <Input
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  handleUpdate(topic.id);
+                                } else if (e.key === "Escape") {
+                                  cancelEdit();
+                                }
+                              }}
+                              className="flex-1"
+                              autoFocus
+                            />
+                            <select
+                              value={editingType}
+                              onChange={(e) => setEditingType(e.target.value as TopicType)}
+                              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[160px]"
+                            >
+                              {TOPIC_TYPES.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleUpdate(topic.id)}
+                              disabled={!editingName.trim()}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex-1 text-sm font-medium">{topic.name}</div>
+                            <Badge variant="outline" className="text-xs">
+                              {topic.type}
+                            </Badge>
+                            <Button variant="ghost" size="sm" onClick={() => startEdit(topic)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(topic.id)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
