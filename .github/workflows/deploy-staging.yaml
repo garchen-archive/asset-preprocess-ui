@@ -1,0 +1,72 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [main,do-deployment]
+    paths:
+      - 'web-ui/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    working-directory: web-ui
+
+jobs:
+  build-push-deploy-staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type check
+        run: npm run type-check || npx tsc --noEmit
+
+      - name: Run linter
+        run: npm run lint || true
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DO Container Registry
+        run: doctl registry login --expiry-seconds 3600
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6.5.0
+        with:
+          context: ./web-ui
+          push: true
+          tags: |
+            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive-webui:latest
+            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive-webui:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Deploy to Staging
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+          app_spec_location: web-ui/.do/app.staging.yaml
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}

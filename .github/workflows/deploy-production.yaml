@@ -1,0 +1,55 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy-to-production" to confirm'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+defaults:
+  run:
+    working-directory: web-ui
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy-to-production" ]; then
+            echo "::error::Confirmation text does not match. Deployment cancelled."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web-ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type check
+        run: npm run type-check || npx tsc --noEmit
+
+      - name: Deploy to Production
+        uses: digitalocean/app_action/deploy@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+          app_spec_location: web-ui/.do/app.yaml
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
