@@ -2,18 +2,12 @@ name: Deploy to Staging
 
 on:
   push:
-    branches: [main,do-deployment]
-    paths:
-      - 'web-ui/**'
+    branches: [main, do-deployment]
   workflow_dispatch:
 
 permissions:
   contents: read
   packages: write
-
-defaults:
-  run:
-    working-directory: web-ui
 
 jobs:
   build-push-deploy-staging:
@@ -28,7 +22,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: web-ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -53,7 +47,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6.5.0
         with:
-          context: ./web-ui
+          context: .
           push: true
           tags: |
             registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive-webui:latest
@@ -65,7 +59,7 @@ jobs:
         uses: digitalocean/app_action/deploy@v2
         with:
           token: ${{ secrets.DO_ACCESS_TOKEN }}
-          app_spec_location: web-ui/.do/app.staging.yaml
+          app_spec_location: .do/app.staging.yaml
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}

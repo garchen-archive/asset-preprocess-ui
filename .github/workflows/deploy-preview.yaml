@@ -3,16 +3,10 @@ name: Deploy PR Preview
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'web-ui/**'
 
 permissions:
   contents: read
   pull-requests: write
-
-defaults:
-  run:
-    working-directory: web-ui
 
 jobs:
   deploy-preview:
@@ -28,7 +22,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: web-ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -44,7 +38,7 @@ jobs:
           token: ${{ secrets.DO_ACCESS_TOKEN }}
           print_build_logs: "true"
           print_deploy_logs: "true"
-          app_spec_location: web-ui/.do/app.preview.yaml
+          app_spec_location: .do/app.preview.yaml
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
