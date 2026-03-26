@@ -32,10 +32,10 @@ services:
         scope: RUN_TIME
         value: ${DATABASE_URL}
 
-      # Auth (injected from GitHub Secrets)
+      # Auth
       - key: NEXTAUTH_URL
         scope: RUN_TIME
-        value: ${NEXTAUTH_URL}
+        value: ${APP_URL}
       - key: NEXTAUTH_SECRET
         scope: RUN_TIME
         value: ${NEXTAUTH_SECRET}
@@ -43,4 +43,4 @@ services:
       # App URL
       - key: NEXT_PUBLIC_APP_URL
         scope: RUN_TIME
-        value: ${NEXTAUTH_URL}
+        value: ${APP_URL}
