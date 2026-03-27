@@ -95,7 +95,10 @@ export const asset = pgTable("asset", {
   youtubeId: text("youtube_id"),
   gdriveUrl: text("gdrive_url"),
   gdriveId: text("gdrive_id"),
-  muxAssetId: text("mux_asset_id"),
+
+  // Media provider (generic - supports Mux, Cloudflare, etc.)
+  mediaProvider: text("media_provider"), // mux, cloudflare, etc.
+  mediaProviderAssetId: text("media_provider_asset_id"), // Provider's asset ID (formerly mux_asset_id)
 
   // 7. TECHNICAL METADATA
   createdDate: timestamp("created_date"),
