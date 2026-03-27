@@ -47,3 +47,20 @@ services:
       - key: NEXT_PUBLIC_APP_URL
         scope: RUN_TIME
         value: ${APP_URL}
+
+      # Backblaze B2 Storage
+      - key: BACKBLAZE_ENDPOINT
+        scope: RUN_TIME
+        value: ${BACKBLAZE_ENDPOINT}
+      - key: BACKBLAZE_REGION
+        scope: RUN_TIME
+        value: ${BACKBLAZE_REGION}
+      - key: BACKBLAZE_KEY_ID
+        scope: RUN_TIME
+        value: ${BACKBLAZE_KEY_ID}
+      - key: BACKBLAZE_APPLICATION_KEY
+        scope: RUN_TIME
+        value: ${BACKBLAZE_APPLICATION_KEY}
+      - key: BACKBLAZE_BUCKET_NAME
+        scope: RUN_TIME
+        value: ${BACKBLAZE_BUCKET_NAME}
