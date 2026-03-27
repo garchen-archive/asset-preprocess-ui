@@ -12,10 +12,6 @@ permissions:
   contents: read
   packages: write
 
-defaults:
-  run:
-    working-directory: web-ui
-
 jobs:
   deploy-production:
     runs-on: ubuntu-latest
@@ -36,7 +32,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: web-ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -48,8 +44,13 @@ jobs:
         uses: digitalocean/app_action/deploy@v2
         with:
           token: ${{ secrets.DO_ACCESS_TOKEN }}
-          app_spec_location: web-ui/.do/app.yaml
+          app_spec_location: .do/app.yaml
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NEXTAUTH_URL: ${{ secrets.NEXTAUTH_URL }}
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+          BACKBLAZE_ENDPOINT: ${{ secrets.BACKBLAZE_ENDPOINT }}
+          BACKBLAZE_REGION: ${{ secrets.BACKBLAZE_REGION }}
+          BACKBLAZE_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
+          BACKBLAZE_APPLICATION_KEY: ${{ secrets.BACKBLAZE_APPLICATION_KEY }}
+          BACKBLAZE_BUCKET_NAME: ${{ secrets.BACKBLAZE_BUCKET_NAME }}

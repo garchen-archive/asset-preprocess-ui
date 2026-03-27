@@ -6,8 +6,8 @@ services:
     # Staging uses pre-built images from DOCR
     image:
       registry_type: DOCR
-      repository: garchen-archive-webui
-      tag: latest
+      repository: garchen-archive
+      tag: webui-latest
 
     http_port: 3000
     instance_count: 1
@@ -32,10 +32,10 @@ services:
         scope: RUN_TIME
         value: ${DATABASE_URL}
 
-      # Auth (injected from GitHub Secrets)
+      # Auth
       - key: NEXTAUTH_URL
         scope: RUN_TIME
-        value: ${NEXTAUTH_URL}
+        value: ${APP_URL}
       - key: NEXTAUTH_SECRET
         scope: RUN_TIME
         value: ${NEXTAUTH_SECRET}
@@ -43,4 +43,21 @@ services:
       # App URL
       - key: NEXT_PUBLIC_APP_URL
         scope: RUN_TIME
-        value: ${NEXTAUTH_URL}
+        value: ${APP_URL}
+
+      # Backblaze B2 Storage
+      - key: BACKBLAZE_ENDPOINT
+        scope: RUN_TIME
+        value: ${BACKBLAZE_ENDPOINT}
+      - key: BACKBLAZE_REGION
+        scope: RUN_TIME
+        value: ${BACKBLAZE_REGION}
+      - key: BACKBLAZE_KEY_ID
+        scope: RUN_TIME
+        value: ${BACKBLAZE_KEY_ID}
+      - key: BACKBLAZE_APPLICATION_KEY
+        scope: RUN_TIME
+        value: ${BACKBLAZE_APPLICATION_KEY}
+      - key: BACKBLAZE_BUCKET_NAME
+        scope: RUN_TIME
+        value: ${BACKBLAZE_BUCKET_NAME}
