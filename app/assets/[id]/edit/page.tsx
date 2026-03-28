@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { EventOrSessionSelect } from "@/components/event-or-session-select";
 import { updateAsset } from "@/lib/actions";
+import { BackblazeLink } from "@/components/backblaze-link";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,9 @@ export default async function AssetEditPage({
                   </svg>
                 </a>
               )}
+              {data.filepath && (
+                <BackblazeLink fileKey={data.filepath} variant="icon" />
+              )}
             </div>
             <h1 className="text-3xl font-bold">Edit Asset</h1>
           </div>
@@ -150,7 +154,7 @@ export default async function AssetEditPage({
             <dd className="mt-1">{data.updatedAt ? new Date(data.updatedAt).toLocaleString() : "—"}</dd>
           </div>
         </div>
-        {(data.gdriveUrl || data.youtubeLink) && (
+        {(data.gdriveUrl || data.youtubeLink || data.filepath) && (
           <div className="mt-4 pt-4 border-t">
             <dt className="font-medium text-muted-foreground mb-2">Links</dt>
             <div className="flex gap-3">
@@ -161,7 +165,7 @@ export default async function AssetEditPage({
                   rel="noopener noreferrer"
                   className="text-sm text-blue-600 hover:underline"
                 >
-                  📁 Open in Google Drive
+                  Open in Google Drive
                 </a>
               )}
               {(data.youtubeLink || (data.gdriveUrl && (data.gdriveUrl.includes('youtube.com') || data.gdriveUrl.includes('youtu.be')))) && (
@@ -171,8 +175,11 @@ export default async function AssetEditPage({
                   rel="noopener noreferrer"
                   className="text-sm text-blue-600 hover:underline"
                 >
-                  ▶️ Watch on YouTube
+                  Watch on YouTube
                 </a>
+              )}
+              {data.filepath && (
+                <BackblazeLink fileKey={data.filepath} className="text-sm" />
               )}
             </div>
           </div>

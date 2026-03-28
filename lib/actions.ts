@@ -92,7 +92,6 @@ export async function deleteAsset(id: string) {
     .where(eq(archiveAssets.id, id));
 
   revalidatePath("/assets");
-  redirect("/assets");
 }
 
 // ============================================================================

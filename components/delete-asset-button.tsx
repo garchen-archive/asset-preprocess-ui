@@ -2,10 +2,21 @@
 
 import { Button } from "@/components/ui/button";
 import { deleteAsset } from "@/lib/actions";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 export function DeleteAssetButton({ id }: { id: string }) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      await deleteAsset(id);
+      router.push("/assets");
+      router.refresh();
+    });
+  };
 
   if (!showConfirm) {
     return (
@@ -26,15 +37,17 @@ export function DeleteAssetButton({ id }: { id: string }) {
         type="button"
         variant="destructive"
         size="sm"
-        onClick={() => deleteAsset(id)}
+        onClick={handleDelete}
+        disabled={isPending}
       >
-        Yes, Delete
+        {isPending ? "Deleting..." : "Yes, Delete"}
       </Button>
       <Button
         type="button"
         variant="outline"
         size="sm"
         onClick={() => setShowConfirm(false)}
+        disabled={isPending}
       >
         Cancel
       </Button>

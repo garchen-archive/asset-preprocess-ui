@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
+import { BackblazeLink } from "@/components/backblaze-link";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,9 @@ export default async function AssetDetailPage({
                     <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
                   </svg>
                 </a>
+              )}
+              {data.filepath && (
+                <BackblazeLink fileKey={data.filepath} variant="icon" />
               )}
             </div>
             <h1 className="text-3xl font-bold">{data.title || data.name || "Untitled Asset"}</h1>
@@ -721,6 +725,16 @@ export default async function AssetDetailPage({
                       </svg>
                       Watch on YouTube
                     </a>
+                  ) : (
+                    "—"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Backblaze Storage</dt>
+                <dd className="text-sm mt-1">
+                  {data.filepath ? (
+                    <BackblazeLink fileKey={data.filepath} />
                   ) : (
                     "—"
                   )}
