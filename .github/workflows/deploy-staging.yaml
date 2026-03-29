@@ -44,16 +44,24 @@ jobs:
       - name: Log in to DO Container Registry
         run: doctl registry login --expiry-seconds 3600
 
+      - name: Get short SHA
+        id: sha
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6.5.0
         with:
           context: .
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-latest
-            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-${{ github.sha }}
+            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-${{ steps.sha.outputs.short }}
+            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-staging
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Update app spec with image tag
+        run: |
+          sed -i 's/tag: webui-staging/tag: webui-${{ steps.sha.outputs.short }}/g' .do/app.staging.yaml
 
       - name: Deploy to Staging
         uses: digitalocean/app_action/deploy@v2
@@ -69,3 +77,9 @@ jobs:
           BACKBLAZE_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
           BACKBLAZE_APPLICATION_KEY: ${{ secrets.BACKBLAZE_APPLICATION_KEY }}
           BACKBLAZE_BUCKET_NAME: ${{ secrets.BACKBLAZE_BUCKET_NAME }}
+
+      - name: Summary
+        run: |
+          echo "### Staging Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image tag:** webui-${{ steps.sha.outputs.short }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

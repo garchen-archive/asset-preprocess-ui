@@ -1,44 +1,53 @@
 name: Deploy to Production
 
 on:
-  workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type "deploy-to-production" to confirm'
-        required: true
-        type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   deploy-production:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Validate confirmation
-        run: |
-          if [ "${{ github.event.inputs.confirm }}" != "deploy-to-production" ]; then
-            echo "::error::Confirmation text does not match. Deployment cancelled."
-            exit 1
-          fi
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Get version and SHA
+        id: info
+        run: |
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
         with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: package-lock.json
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Log in to DO Container Registry
+        run: doctl registry login --expiry-seconds 3600
 
-      - name: Run type check
-        run: npm run type-check || npx tsc --noEmit
+      - name: Re-tag image with version
+        run: |
+          REGISTRY="registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}"
+          SHA_TAG="webui-${{ steps.info.outputs.short_sha }}"
+          VERSION_TAG="webui-${{ steps.info.outputs.tag }}"
+
+          echo "Pulling $REGISTRY/garchen-archive:$SHA_TAG"
+          docker pull $REGISTRY/garchen-archive:$SHA_TAG
+
+          echo "Tagging as $VERSION_TAG"
+          docker tag $REGISTRY/garchen-archive:$SHA_TAG $REGISTRY/garchen-archive:$VERSION_TAG
+
+          echo "Pushing $VERSION_TAG"
+          docker push $REGISTRY/garchen-archive:$VERSION_TAG
+
+      - name: Update app spec with version tag
+        run: |
+          sed -i 's/tag: webui-production/tag: webui-${{ steps.info.outputs.tag }}/g' .do/app.yaml
 
       - name: Deploy to Production
         uses: digitalocean/app_action/deploy@v2
@@ -54,3 +63,10 @@ jobs:
           BACKBLAZE_KEY_ID: ${{ secrets.BACKBLAZE_KEY_ID }}
           BACKBLAZE_APPLICATION_KEY: ${{ secrets.BACKBLAZE_APPLICATION_KEY }}
           BACKBLAZE_BUCKET_NAME: ${{ secrets.BACKBLAZE_BUCKET_NAME }}
+
+      - name: Summary
+        run: |
+          echo "### Production Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.info.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source image:** webui-${{ steps.info.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tagged as:** webui-${{ steps.info.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
