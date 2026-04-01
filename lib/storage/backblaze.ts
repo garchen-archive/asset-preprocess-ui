@@ -20,11 +20,14 @@ const BUCKET_NAME = process.env.BACKBLAZE_BUCKET_NAME || "garchen-archive";
  */
 export async function getPresignedUrl(
   key: string,
-  expiresIn: number = 3600
+  expiresIn: number = 3600,
+  inline: boolean = true
 ): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
+    // Set inline disposition so videos play in browser instead of downloading
+    ...(inline && { ResponseContentDisposition: "inline" }),
   });
 
   const url = await getSignedUrl(s3Client, command, { expiresIn });

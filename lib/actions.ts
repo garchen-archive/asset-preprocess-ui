@@ -509,15 +509,15 @@ export async function bulkCreateSessions(
 // TOPICS AND CATEGORIES ACTIONS
 // ============================================================================
 
-export async function createTopic(name: string, type: string) {
-  const [topic] = await db
+export async function createTopic(name: string) {
+  const [newTopic] = await db
     .insert(topics)
-    .values({ name: name.trim(), type })
+    .values({ name: name.trim() })
     .returning();
 
   revalidatePath("/events");
   revalidatePath("/sessions");
-  return topic;
+  return newTopic;
 }
 
 export async function createCategory(name: string, type: string) {

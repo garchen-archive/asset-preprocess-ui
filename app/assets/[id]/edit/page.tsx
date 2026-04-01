@@ -87,7 +87,7 @@ export default async function AssetEditPage({
                   </svg>
                 </a>
               )}
-              {data.filepath && (
+              {data.metadataSource === 'backblaze' && data.filepath && (
                 <BackblazeLink fileKey={data.filepath} variant="icon" />
               )}
             </div>
@@ -154,7 +154,7 @@ export default async function AssetEditPage({
             <dd className="mt-1">{data.updatedAt ? new Date(data.updatedAt).toLocaleString() : "—"}</dd>
           </div>
         </div>
-        {(data.gdriveUrl || data.youtubeLink || data.filepath) && (
+        {(data.gdriveUrl || data.youtubeLink || (data.metadataSource === 'backblaze' && data.filepath)) && (
           <div className="mt-4 pt-4 border-t">
             <dt className="font-medium text-muted-foreground mb-2">Links</dt>
             <div className="flex gap-3">
@@ -178,7 +178,7 @@ export default async function AssetEditPage({
                   Watch on YouTube
                 </a>
               )}
-              {data.filepath && (
+              {data.metadataSource === 'backblaze' && data.filepath && (
                 <BackblazeLink fileKey={data.filepath} className="text-sm" />
               )}
             </div>
