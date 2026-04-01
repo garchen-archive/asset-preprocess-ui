@@ -1,13 +1,16 @@
-// Topic Types
-export const TOPIC_TYPES = [
+// Topic Types (loaded from database, these are fallback defaults)
+export const DEFAULT_TOPIC_TYPES = [
   "Deities",
-  "Practices",
-  "Core Teachings",
+  "Masters",
+  "Subjects",
   "Texts",
-  "Historical Figures",
 ] as const;
 
-export type TopicType = typeof TOPIC_TYPES[number];
+export type TopicTypeName = typeof DEFAULT_TOPIC_TYPES[number];
+
+// Legacy alias for backwards compatibility
+export const TOPIC_TYPES = DEFAULT_TOPIC_TYPES;
+export type TopicType = TopicTypeName;
 
 // Category Types
 export const CATEGORY_TYPES = [

@@ -307,13 +307,28 @@ export type Credential = typeof credentials.$inferSelect;
 export type NewCredential = typeof credentials.$inferInsert;
 
 // ============================================================================
+// TOPIC_TYPE
+// Classification types for topics (Deities, Masters, Subjects, Texts)
+// ============================================================================
+
+export const topicType = pgTable("topic_type", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type TopicType = typeof topicType.$inferSelect;
+export type NewTopicType = typeof topicType.$inferInsert;
+
+// ============================================================================
 // TOPIC (formerly topics)
 // ============================================================================
 
 export const topic = pgTable("topic", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull().unique(),
-  type: text("type").notNull(), // Deities, Practices, Core Teachings, Texts, Historical Figures
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -323,6 +338,19 @@ export type NewTopic = typeof topic.$inferInsert;
 
 // Legacy alias
 export const topics = topic;
+
+// ============================================================================
+// TOPIC_CLASSIFICATION
+// Junction table for topic to topic_type (many-to-many)
+// ============================================================================
+
+export const topicClassification = pgTable("topic_classification", {
+  topicId: uuid("topic_id").notNull().references(() => topic.id, { onDelete: "cascade" }),
+  topicTypeId: uuid("topic_type_id").notNull().references(() => topicType.id, { onDelete: "cascade" }),
+});
+
+export type TopicClassification = typeof topicClassification.$inferSelect;
+export type NewTopicClassification = typeof topicClassification.$inferInsert;
 
 // ============================================================================
 // CATEGORY (formerly categories)

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { topics, eventTopics, sessionTopics } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { topic, topicType, topicClassification } from "@/lib/db/schema";
+import { eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function PATCH(
@@ -8,36 +8,48 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { name, type } = await request.json();
+    const { name, typeIds } = await request.json();
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const updateData: any = { name: name.trim(), updatedAt: new Date() };
-    if (type !== undefined) {
-      if (!type || !type.trim()) {
-        return NextResponse.json({ error: "Type cannot be empty" }, { status: 400 });
-      }
-      updateData.type = type.trim();
-    }
-
+    // Update the topic name
     const [updatedTopic] = await db
-      .update(topics)
-      .set(updateData)
-      .where(eq(topics.id, params.id))
+      .update(topic)
+      .set({ name: name.trim(), updatedAt: new Date() })
+      .where(eq(topic.id, params.id))
       .returning();
 
     if (!updatedTopic) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
-    return NextResponse.json(updatedTopic);
+    // Update classifications if typeIds provided
+    if (typeIds !== undefined && Array.isArray(typeIds)) {
+      // Delete existing classifications
+      await db
+        .delete(topicClassification)
+        .where(eq(topicClassification.topicId, params.id));
+
+      // Insert new classifications
+      if (typeIds.length > 0) {
+        await db.insert(topicClassification).values(
+          typeIds.map((typeId: string) => ({
+            topicId: params.id,
+            topicTypeId: typeId,
+          }))
+        );
+      }
+    }
+
+    // Fetch the topic with its types
+    const topicWithTypes = await getTopicWithTypes(params.id);
+    return NextResponse.json(topicWithTypes);
   } catch (error: any) {
     console.error("Error updating topic:", error);
 
-    // Handle unique constraint violation
-    if (error?.code === '23505') {
+    if (error?.code === "23505") {
       return NextResponse.json(
         { error: "A topic with this name already exists" },
         { status: 409 }
@@ -58,8 +70,8 @@ export async function DELETE(
   try {
     // Delete will cascade to junction tables due to ON DELETE CASCADE
     const [deletedTopic] = await db
-      .delete(topics)
-      .where(eq(topics.id, params.id))
+      .delete(topic)
+      .where(eq(topic.id, params.id))
       .returning();
 
     if (!deletedTopic) {
@@ -74,4 +86,30 @@ export async function DELETE(
       { status: 500 }
     );
   }
+}
+
+async function getTopicWithTypes(topicId: string) {
+  const [t] = await db.select().from(topic).where(eq(topic.id, topicId));
+  if (!t) return null;
+
+  const classifications = await db
+    .select()
+    .from(topicClassification)
+    .where(eq(topicClassification.topicId, topicId));
+
+  const typeIds = classifications.map((c) => c.topicTypeId);
+
+  let types: any[] = [];
+  if (typeIds.length > 0) {
+    types = await db
+      .select()
+      .from(topicType)
+      .where(inArray(topicType.id, typeIds));
+  }
+
+  return {
+    ...t,
+    typeIds,
+    types,
+  };
 }

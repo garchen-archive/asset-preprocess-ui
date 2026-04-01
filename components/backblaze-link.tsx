@@ -16,7 +16,7 @@ export function BackblazeLink({ fileKey, variant = "full", className = "" }: Bac
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/storage/presign?key=${encodeURIComponent(fileKey)}&expires=3600`);
+      const response = await fetch(`/api/storage/presign?key=${encodeURIComponent(fileKey)}&expires=7200&inline=true`);
       if (!response.ok) {
         throw new Error("Failed to get presigned URL");
       }
@@ -24,16 +24,16 @@ export function BackblazeLink({ fileKey, variant = "full", className = "" }: Bac
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       console.error("Failed to open Backblaze file:", error);
-      alert("Failed to generate download link. Please try again.");
+      alert("Failed to open file. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  // Backblaze/B2 icon (cloud storage icon)
-  const icon = (
+  // Play icon
+  const playIcon = (
     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+      <path d="M8 5v14l11-7z"/>
     </svg>
   );
 
@@ -42,7 +42,7 @@ export function BackblazeLink({ fileKey, variant = "full", className = "" }: Bac
       <button
         onClick={handleClick}
         disabled={loading}
-        title="Download from Backblaze"
+        title="Play from Backblaze"
         className={`text-blue-600 hover:opacity-75 transition-opacity disabled:opacity-50 ${className}`}
       >
         {loading ? (
@@ -51,7 +51,7 @@ export function BackblazeLink({ fileKey, variant = "full", className = "" }: Bac
           </svg>
         ) : (
           <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/>
+            <path d="M8 5v14l11-7z"/>
           </svg>
         )}
       </button>
@@ -64,8 +64,8 @@ export function BackblazeLink({ fileKey, variant = "full", className = "" }: Bac
       disabled={loading}
       className={`text-blue-600 hover:underline inline-flex items-center gap-1 disabled:opacity-50 ${className}`}
     >
-      {icon}
-      {loading ? "Loading..." : "Download from Storage"}
+      {playIcon}
+      {loading ? "Loading..." : "Play from Storage"}
     </button>
   );
 }

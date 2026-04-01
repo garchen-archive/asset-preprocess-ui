@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Pencil, Trash2, X, Check, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Category } from "@/lib/db/schema";
 import { CATEGORY_TYPES, type CategoryType } from "@/lib/constants";
@@ -20,37 +20,6 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
   const [editingName, setEditingName] = useState("");
   const [editingType, setEditingType] = useState<CategoryType | "">("");
   const [isCreating, setIsCreating] = useState(false);
-  const [expandedTypes, setExpandedTypes] = useState<Set<string>>(
-    new Set(CATEGORY_TYPES)
-  );
-
-  // Group categories by type
-  const { categoriesByType, otherCategories } = useMemo(() => {
-    const grouped = new Map<string, Category[]>();
-    CATEGORY_TYPES.forEach(type => grouped.set(type, []));
-    const other: Category[] = [];
-
-    categories.forEach(category => {
-      if (CATEGORY_TYPES.includes(category.type as CategoryType)) {
-        const existing = grouped.get(category.type) || [];
-        grouped.set(category.type, [...existing, category]);
-      } else {
-        other.push(category);
-      }
-    });
-
-    return { categoriesByType: grouped, otherCategories: other };
-  }, [categories]);
-
-  const toggleType = (type: string) => {
-    const newExpanded = new Set(expandedTypes);
-    if (newExpanded.has(type)) {
-      newExpanded.delete(type);
-    } else {
-      newExpanded.add(type);
-    }
-    setExpandedTypes(newExpanded);
-  };
 
   const handleCreate = async () => {
     if (!newCategoryName.trim()) return;
@@ -167,7 +136,7 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
         </div>
       </div>
 
-      {/* Categories list grouped by type */}
+      {/* Categories list */}
       <div className="rounded-lg border">
         <div className="p-4 border-b bg-muted/50">
           <h2 className="font-semibold">All Categories ({categories.length})</h2>
@@ -177,195 +146,72 @@ export function CategoriesManager({ initialCategories }: CategoriesManagerProps)
             No categories yet. Create one above to get started.
           </div>
         ) : (
-          <div>
-            {CATEGORY_TYPES.map((type) => {
-              const typeCategories = categoriesByType.get(type) || [];
-              const isExpanded = expandedTypes.has(type);
-
-              return (
-                <div key={type} className="border-b last:border-b-0">
-                  {/* Type header */}
-                  <button
-                    onClick={() => toggleType(type)}
-                    className="w-full p-4 flex items-center gap-2 hover:bg-muted/30 transition-colors"
-                  >
-                    {isExpanded ? (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="font-semibold">{type}</span>
-                    <Badge variant="secondary" className="ml-auto">
-                      {typeCategories.length}
+          <div className="divide-y">
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="p-3 px-4 flex items-center gap-3 hover:bg-muted/30"
+              >
+                {editingId === category.id ? (
+                  <>
+                    <Input
+                      type="text"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleUpdate(category.id);
+                        } else if (e.key === "Escape") {
+                          cancelEdit();
+                        }
+                      }}
+                      className="flex-1"
+                      autoFocus
+                    />
+                    <select
+                      value={editingType}
+                      onChange={(e) => setEditingType(e.target.value as CategoryType)}
+                      className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[160px]"
+                    >
+                      {CATEGORY_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleUpdate(category.id)}
+                      disabled={!editingName.trim()}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={cancelEdit}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex-1 text-sm font-medium">{category.name}</div>
+                    <Badge variant="outline" className="text-xs">
+                      {category.type}
                     </Badge>
-                  </button>
-
-                  {/* Categories under this type */}
-                  {isExpanded && (
-                    <div className="bg-muted/20">
-                      {typeCategories.length === 0 ? (
-                        <div className="p-4 pl-10 text-sm text-muted-foreground italic">
-                          No categories in this type yet
-                        </div>
-                      ) : (
-                        typeCategories.map((category) => (
-                          <div
-                            key={category.id}
-                            className="p-3 pl-10 flex items-center gap-3 hover:bg-muted/40 border-t first:border-t-0"
-                          >
-                            {editingId === category.id ? (
-                              <>
-                                <Input
-                                  type="text"
-                                  value={editingName}
-                                  onChange={(e) => setEditingName(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      handleUpdate(category.id);
-                                    } else if (e.key === "Escape") {
-                                      cancelEdit();
-                                    }
-                                  }}
-                                  className="flex-1"
-                                  autoFocus
-                                />
-                                <select
-                                  value={editingType}
-                                  onChange={(e) => setEditingType(e.target.value as CategoryType)}
-                                  className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[160px]"
-                                >
-                                  {CATEGORY_TYPES.map((t) => (
-                                    <option key={t} value={t}>
-                                      {t}
-                                    </option>
-                                  ))}
-                                </select>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleUpdate(category.id)}
-                                  disabled={!editingName.trim()}
-                                >
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </>
-                            ) : (
-                              <>
-                                <div className="flex-1 text-sm font-medium">{category.name}</div>
-                                <Button variant="ghost" size="sm" onClick={() => startEdit(category)}>
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(category.id)}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Other categories (imported, etc.) */}
-            {otherCategories.length > 0 && (
-              <div className="border-b last:border-b-0">
-                <button
-                  onClick={() => toggleType("Other")}
-                  className="w-full p-4 flex items-center gap-2 hover:bg-muted/30 transition-colors"
-                >
-                  {expandedTypes.has("Other") ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className="font-semibold">Other</span>
-                  <Badge variant="outline" className="ml-auto">
-                    {otherCategories.length}
-                  </Badge>
-                </button>
-
-                {expandedTypes.has("Other") && (
-                  <div className="bg-muted/20">
-                    {otherCategories.map((category) => (
-                      <div
-                        key={category.id}
-                        className="p-3 pl-10 flex items-center gap-3 hover:bg-muted/40 border-t first:border-t-0"
-                      >
-                        {editingId === category.id ? (
-                          <>
-                            <Input
-                              type="text"
-                              value={editingName}
-                              onChange={(e) => setEditingName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  handleUpdate(category.id);
-                                } else if (e.key === "Escape") {
-                                  cancelEdit();
-                                }
-                              }}
-                              className="flex-1"
-                              autoFocus
-                            />
-                            <select
-                              value={editingType}
-                              onChange={(e) => setEditingType(e.target.value as CategoryType)}
-                              className="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm min-w-[160px]"
-                            >
-                              {CATEGORY_TYPES.map((t) => (
-                                <option key={t} value={t}>
-                                  {t}
-                                </option>
-                              ))}
-                            </select>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleUpdate(category.id)}
-                              disabled={!editingName.trim()}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex-1 text-sm font-medium">{category.name}</div>
-                            <Badge variant="outline" className="text-xs">
-                              {category.type}
-                            </Badge>
-                            <Button variant="ghost" size="sm" onClick={() => startEdit(category)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(category.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                    <Button variant="ghost" size="sm" onClick={() => startEdit(category)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(category.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
                 )}
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>

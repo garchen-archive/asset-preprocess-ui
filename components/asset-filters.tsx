@@ -163,6 +163,7 @@ export function AssetFilters({
             <option value="">All Sources</option>
             <option value="gdrive">Google Drive</option>
             <option value="youtube">YouTube</option>
+            <option value="backblaze">Backblaze</option>
           </select>
         </div>
       </div>

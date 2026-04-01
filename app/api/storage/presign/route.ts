@@ -18,8 +18,11 @@ export async function GET(request: NextRequest) {
   // Optional: expiration time in seconds (default 1 hour)
   const expiresIn = parseInt(request.nextUrl.searchParams.get("expires") || "3600", 10);
 
+  // Optional: inline disposition (default true for viewing in browser)
+  const inline = request.nextUrl.searchParams.get("inline") !== "false";
+
   try {
-    const url = await getPresignedUrl(key, expiresIn);
+    const url = await getPresignedUrl(key, expiresIn, inline);
     return NextResponse.json({ url });
   } catch (error) {
     console.error("Failed to generate presigned URL:", error);

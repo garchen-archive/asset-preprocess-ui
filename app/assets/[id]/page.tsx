@@ -115,7 +115,7 @@ export default async function AssetDetailPage({
                   </svg>
                 </a>
               )}
-              {data.filepath && (
+              {data.metadataSource === 'backblaze' && data.filepath && (
                 <BackblazeLink fileKey={data.filepath} variant="icon" />
               )}
             </div>
@@ -730,16 +730,18 @@ export default async function AssetDetailPage({
                   )}
                 </dd>
               </div>
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Backblaze Storage</dt>
-                <dd className="text-sm mt-1">
-                  {data.filepath ? (
-                    <BackblazeLink fileKey={data.filepath} />
-                  ) : (
-                    "—"
-                  )}
-                </dd>
-              </div>
+              {data.metadataSource === 'backblaze' && (
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Backblaze Storage</dt>
+                  <dd className="text-sm mt-1">
+                    {data.filepath ? (
+                      <BackblazeLink fileKey={data.filepath} />
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Source</dt>
                 <dd className="text-sm mt-1 capitalize">{data.metadataSource}</dd>
