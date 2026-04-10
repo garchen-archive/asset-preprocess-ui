@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
-import { deleteOrganization } from "@/lib/actions";
+import { deleteOrganization, unlinkLocationFromOrganization } from "@/lib/actions";
 import { formatDateRange, getDateMeta } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -206,12 +206,22 @@ export default async function OrganizationDetailPage({
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <Link
-                            href={`/locations/${loc.locationId}`}
-                            className="text-blue-600 hover:underline"
-                          >
-                            View
-                          </Link>
+                          <div className="flex items-center gap-3">
+                            <Link
+                              href={`/locations/${loc.locationId}`}
+                              className="text-blue-600 hover:underline"
+                            >
+                              View
+                            </Link>
+                            <form action={unlinkLocationFromOrganization.bind(null, loc.linkId, params.id)}>
+                              <button
+                                type="submit"
+                                className="text-red-600 hover:underline text-sm"
+                              >
+                                Unlink
+                              </button>
+                            </form>
+                          </div>
                         </td>
                       </tr>
                     ))}

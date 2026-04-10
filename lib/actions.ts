@@ -946,6 +946,37 @@ export async function unlinkAddressFromLocation(linkId: string, locationId: stri
   redirect(`/locations/${locationId}`);
 }
 
+export async function linkLocationToOrganization(organizationId: string, formData: FormData) {
+  const locationId = formData.get("locationId") as string;
+  const isPrimary = formData.get("isPrimary") === "on";
+  const role = formData.get("role") as string || null;
+
+  // If setting as primary, unset existing primary for this organization
+  if (isPrimary) {
+    await db
+      .update(organizationLocations)
+      .set({ isPrimary: false })
+      .where(eq(organizationLocations.organizationId, organizationId));
+  }
+
+  await db.insert(organizationLocations).values({
+    organizationId,
+    locationId,
+    isPrimary,
+    role,
+  });
+
+  revalidatePath(`/organizations/${organizationId}`);
+  redirect(`/organizations/${organizationId}`);
+}
+
+export async function unlinkLocationFromOrganization(linkId: string, organizationId: string) {
+  await db.delete(organizationLocations).where(eq(organizationLocations.id, linkId));
+
+  revalidatePath(`/organizations/${organizationId}`);
+  redirect(`/organizations/${organizationId}`);
+}
+
 export async function updateLocationAddressLink(linkId: string, locationId: string, formData: FormData) {
   const isPrimary = formData.get("isPrimary") === "on";
 

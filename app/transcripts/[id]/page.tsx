@@ -4,7 +4,8 @@ import { eq, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { deleteTranscript } from "@/lib/actions";
+import { DeleteTranscriptButton } from "@/components/delete-transcript-button";
+import { BackblazeLink } from "@/components/backblaze-link";
 
 export const dynamic = "force-dynamic";
 
@@ -125,19 +126,7 @@ export default async function TranscriptDetailPage({
           <Button variant="outline" asChild>
             <Link href={`/transcripts/${params.id}/edit`}>Edit</Link>
           </Button>
-          <form action={deleteTranscript.bind(null, params.id)}>
-            <Button
-              type="submit"
-              variant="destructive"
-              onClick={(e) => {
-                if (!confirm("Are you sure you want to delete this transcript?")) {
-                  e.preventDefault();
-                }
-              }}
-            >
-              Delete
-            </Button>
-          </form>
+          <DeleteTranscriptButton id={params.id} />
         </div>
       </div>
 
@@ -322,6 +311,11 @@ export default async function TranscriptDetailPage({
                     {canonicalAsset.fileFormat || "—"}
                   </dd>
                 </div>
+                {canonicalAsset.filepath && (
+                  <div className="pt-2">
+                    <BackblazeLink fileKey={canonicalAsset.filepath} label="View SRT File" />
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No transcript file linked</p>
@@ -412,6 +406,11 @@ export default async function TranscriptDetailPage({
                   <dt className="text-xs font-medium text-muted-foreground">Type</dt>
                   <dd className="mt-0.5 text-sm capitalize">{mediaAsset.assetType || "—"}</dd>
                 </div>
+                {(mediaAsset.metadataSource === 'backblaze' || mediaAsset.metadataSource === 'pipeline') && mediaAsset.filepath && (
+                  <div className="pt-2">
+                    <BackblazeLink fileKey={mediaAsset.filepath} />
+                  </div>
+                )}
               </div>
             </div>
           )}

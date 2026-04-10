@@ -100,6 +100,9 @@ export const asset = pgTable("asset", {
   mediaProvider: text("media_provider"), // mux, cloudflare, etc.
   mediaProviderAssetId: text("media_provider_asset_id"), // Provider's asset ID (formerly mux_asset_id)
 
+  // Storage (generic - supports Backblaze, S3, etc.)
+  storageUrl: text("storage_url"), // Direct URL to file in storage (Backblaze, S3, etc.)
+
   // 7. TECHNICAL METADATA
   createdDate: timestamp("created_date"),
   modifiedDate: timestamp("modified_date"),
