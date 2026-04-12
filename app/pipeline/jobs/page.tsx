@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ const jobTypeColors: Record<string, string> = {
   folder_import: "bg-teal-50 text-teal-700 border-teal-200",
 };
 
-export default function JobsPage() {
+function JobsContent() {
   const searchParams = useSearchParams();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
@@ -519,5 +519,13 @@ export default function JobsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function JobsPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">Loading...</div>}>
+      <JobsContent />
+    </Suspense>
   );
 }

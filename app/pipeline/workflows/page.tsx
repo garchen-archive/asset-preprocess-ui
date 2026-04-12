@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-gray-100 text-gray-800 border-gray-200",
 };
 
-export default function WorkflowsPage() {
+function WorkflowsContent() {
   const searchParams = useSearchParams();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -428,5 +428,13 @@ export default function WorkflowsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function WorkflowsPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-12">Loading...</div>}>
+      <WorkflowsContent />
+    </Suspense>
   );
 }
