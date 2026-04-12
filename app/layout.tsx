@@ -57,6 +57,27 @@ export default function RootLayout({
                   <a href="/taxonomy" className="text-sm font-medium hover:underline">
                     Topics & Categories
                   </a>
+                  <div className="relative group">
+                    <a href="/pipeline" className="text-sm font-medium hover:underline">
+                      Pipeline
+                    </a>
+                    <div className="absolute left-0 top-full pt-1 hidden group-hover:block z-50">
+                      <div className="bg-background border rounded-md shadow-lg py-1 min-w-[140px]">
+                        <a href="/pipeline" className="block px-4 py-2 text-sm hover:bg-muted">
+                          Overview
+                        </a>
+                        <a href="/pipeline/import" className="block px-4 py-2 text-sm hover:bg-muted">
+                          Import
+                        </a>
+                        <a href="/pipeline/workflows" className="block px-4 py-2 text-sm hover:bg-muted">
+                          Workflows
+                        </a>
+                        <a href="/pipeline/jobs" className="block px-4 py-2 text-sm hover:bg-muted">
+                          Jobs
+                        </a>
+                      </div>
+                    </div>
+                  </div>
                   <div className="ml-4 pl-4 border-l">
                     <UserMenu />
                   </div>
