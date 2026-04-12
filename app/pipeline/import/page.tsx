@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 
 type ImportMode = "single" | "folder";
-type Provider = "backblaze" | "gdrive" | "s3";
+type Provider = "backblaze" | "gdrive";
 
 interface ImportResult {
   success: boolean;
@@ -143,14 +143,14 @@ export default function StorageImportPage() {
             <div className="space-y-2 mb-4">
               <Label>Storage Provider</Label>
               <div className="flex gap-2">
-                {(["backblaze", "gdrive", "s3"] as Provider[]).map((p) => (
+                {(["backblaze", "gdrive"] as Provider[]).map((p) => (
                   <Button
                     key={p}
                     size="sm"
                     variant={provider === p ? "default" : "outline"}
                     onClick={() => setProvider(p)}
                   >
-                    {p === "backblaze" ? "Backblaze" : p === "gdrive" ? "Google Drive" : "S3"}
+                    {p === "backblaze" ? "Backblaze" : "Google Drive"}
                   </Button>
                 ))}
               </div>
