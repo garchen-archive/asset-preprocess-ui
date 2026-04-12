@@ -64,3 +64,11 @@ services:
       - key: BACKBLAZE_BUCKET_NAME
         scope: RUN_TIME
         value: ${BACKBLAZE_BUCKET_NAME}
+
+      # Content Processing Pipeline
+      - key: PIPELINE_API_URL
+        scope: RUN_TIME
+        value: ${PIPELINE_API_URL}
+      - key: PIPELINE_API_KEY
+        scope: RUN_TIME
+        value: ${PIPELINE_API_KEY}
