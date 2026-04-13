@@ -7,6 +7,7 @@ import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { BackblazeLink } from "@/components/backblaze-link";
+import { MuxVideoPlayer } from "@/components/mux-video-player";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,16 @@ export default async function AssetDetailPage({
               {(data.metadataSource === 'backblaze' || data.metadataSource === 'pipeline') && data.filepath && (
                 <BackblazeLink fileKey={data.filepath} variant="icon" />
               )}
+              {data.mediaProvider === "mux" && data.mediaProviderAssetId && (
+                <span
+                  title="Available on Mux"
+                  className="text-pink-600"
+                >
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                  </svg>
+                </span>
+              )}
             </div>
             <h1 className="text-3xl font-bold">{data.title || data.name || "Untitled Asset"}</h1>
           </div>
@@ -132,6 +143,152 @@ export default async function AssetDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Main details */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Video Platform Section - Show if Mux is configured */}
+          {data.mediaProvider === "mux" && data.mediaProviderAssetId && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-xl font-semibold mb-4">Video Platform</h2>
+
+              {/* Video Player */}
+              {(() => {
+                const mediaProviderData = data.additionalMetadata?.media_provider as {
+                  playback_id?: string;
+                  urls?: {
+                    playback?: string;
+                    thumbnail?: string;
+                    mp4_high?: string;
+                    mp4_medium?: string;
+                    mp4_low?: string;
+                  };
+                  duration?: number;
+                  aspect_ratio?: string;
+                  status?: string;
+                } | undefined;
+
+                const playbackId = mediaProviderData?.playback_id;
+
+                if (playbackId) {
+                  return (
+                    <div className="mb-4">
+                      <MuxVideoPlayer
+                        playbackId={playbackId}
+                        title={data.title || data.name || undefined}
+                      />
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Platform Info */}
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Provider</dt>
+                  <dd className="text-sm mt-1">
+                    <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-pink-100 text-pink-700 capitalize">
+                      {data.mediaProvider}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Asset ID</dt>
+                  <dd className="text-sm mt-1 font-mono text-xs">{data.mediaProviderAssetId}</dd>
+                </div>
+
+                {(() => {
+                  const mediaProviderData = data.additionalMetadata?.media_provider as {
+                    playback_id?: string;
+                    duration?: number;
+                    aspect_ratio?: string;
+                    status?: string;
+                    urls?: {
+                      mp4_high?: string;
+                      mp4_medium?: string;
+                      mp4_low?: string;
+                    };
+                  } | undefined;
+
+                  return (
+                    <>
+                      {mediaProviderData?.playback_id && (
+                        <div>
+                          <dt className="text-sm font-medium text-muted-foreground">Playback ID</dt>
+                          <dd className="text-sm mt-1 font-mono text-xs">{mediaProviderData.playback_id}</dd>
+                        </div>
+                      )}
+                      {mediaProviderData?.status && (
+                        <div>
+                          <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                          <dd className="text-sm mt-1">
+                            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                              mediaProviderData.status === "ready"
+                                ? "bg-green-100 text-green-700"
+                                : mediaProviderData.status === "preparing"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-gray-100 text-gray-700"
+                            }`}>
+                              {mediaProviderData.status}
+                            </span>
+                          </dd>
+                        </div>
+                      )}
+                      {mediaProviderData?.duration && (
+                        <div>
+                          <dt className="text-sm font-medium text-muted-foreground">Duration</dt>
+                          <dd className="text-sm mt-1">
+                            {Math.floor(mediaProviderData.duration / 60)}:{String(Math.floor(mediaProviderData.duration % 60)).padStart(2, '0')}
+                          </dd>
+                        </div>
+                      )}
+                      {mediaProviderData?.aspect_ratio && (
+                        <div>
+                          <dt className="text-sm font-medium text-muted-foreground">Aspect Ratio</dt>
+                          <dd className="text-sm mt-1">{mediaProviderData.aspect_ratio}</dd>
+                        </div>
+                      )}
+                      {mediaProviderData?.urls && (
+                        <div className="md:col-span-2">
+                          <dt className="text-sm font-medium text-muted-foreground mb-2">Download Links</dt>
+                          <dd className="flex flex-wrap gap-2">
+                            {mediaProviderData.urls.mp4_high && (
+                              <a
+                                href={mediaProviderData.urls.mp4_high}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              >
+                                MP4 High
+                              </a>
+                            )}
+                            {mediaProviderData.urls.mp4_medium && (
+                              <a
+                                href={mediaProviderData.urls.mp4_medium}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              >
+                                MP4 Medium
+                              </a>
+                            )}
+                            {mediaProviderData.urls.mp4_low && (
+                              <a
+                                href={mediaProviderData.urls.mp4_low}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
+                              >
+                                MP4 Low
+                              </a>
+                            )}
+                          </dd>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </dl>
+            </div>
+          )}
+
           {/* Identity Section */}
           <div className="rounded-lg border p-6">
             <h2 className="text-xl font-semibold mb-4">Identity</h2>
