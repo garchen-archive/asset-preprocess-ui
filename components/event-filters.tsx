@@ -17,6 +17,7 @@ interface EventFiltersProps {
   organizerFilter: string;
   hostingCenterFilter: string;
   countryFilter: string;
+  locationCountryFilter: string;
   locationRawFilter: string;
   metadataSearch: string;
   dateFromFilter: string;
@@ -28,6 +29,7 @@ interface EventFiltersProps {
   availableOrganizers: { id: string; code: string; name: string }[];
   availableHostingCenters: string[];
   availableCountries: string[];
+  availableLocationCountries: string[];
   availableLocationTexts: string[];
   availableTopics: { id: string; name: string }[];
   availableCategories: { id: string; name: string }[];
@@ -43,6 +45,7 @@ export function EventFilters({
   organizerFilter,
   hostingCenterFilter,
   countryFilter,
+  locationCountryFilter,
   locationRawFilter,
   metadataSearch,
   dateFromFilter,
@@ -54,6 +57,7 @@ export function EventFilters({
   availableOrganizers,
   availableHostingCenters,
   availableCountries,
+  availableLocationCountries,
   availableLocationTexts,
   availableTopics,
   availableCategories,
@@ -64,6 +68,9 @@ export function EventFilters({
     (dateExactFilter ? 1 : 0) +
     selectedTopicIds.length +
     selectedCategoryIds.length;
+
+  const locationFilterCount =
+    (locationCountryFilter ? 1 : 0);
 
   const metadataFilterCount =
     (hostingCenterFilter ? 1 : 0) +
@@ -81,6 +88,7 @@ export function EventFilters({
     organizerFilter ||
     hostingCenterFilter ||
     countryFilter ||
+    locationCountryFilter ||
     locationRawFilter ||
     metadataSearch ||
     dateFromFilter ||
@@ -186,6 +194,36 @@ export function EventFilters({
           </select>
         </div>
       </div>
+
+      {/* Location Filters - Unified country search */}
+      {availableLocationCountries.length > 0 && (
+        <CollapsibleFilterSection
+          title="Location Filters"
+          badge={locationFilterCount}
+          defaultOpen={locationFilterCount > 0}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium mb-1 block">Country (All Sources)</label>
+              <select
+                name="locationCountry"
+                defaultValue={locationCountryFilter}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
+              >
+                <option value="">All Countries</option>
+                {availableLocationCountries.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Searches venue location, host org location, and raw metadata
+              </p>
+            </div>
+          </div>
+        </CollapsibleFilterSection>
+      )}
 
       {/* Advanced Filters - Date, Topic, Category */}
       <CollapsibleFilterSection

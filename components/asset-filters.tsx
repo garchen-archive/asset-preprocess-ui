@@ -30,6 +30,8 @@ interface AssetFiltersProps {
   dateSearchFilter: string;
   dateFromFilter: string;
   dateToFilter: string;
+  locationCountryFilter: string;
+  availableLocationCountries: string[];
 }
 
 const PROCESSING_STATUS_OPTIONS = [
@@ -85,9 +87,12 @@ export function AssetFilters({
   dateSearchFilter,
   dateFromFilter,
   dateToFilter,
+  locationCountryFilter,
+  availableLocationCountries,
 }: AssetFiltersProps) {
   // Count active filters for badges
   const dateFilterCount = (dateSearchFilter ? 1 : 0) + (dateFromFilter ? 1 : 0) + (dateToFilter ? 1 : 0);
+  const locationFilterCount = (locationCountryFilter ? 1 : 0);
   const processingFilterCount = selectedStatuses.length + selectedPublicationStatuses.length + (needsDetailedReviewFilter ? 1 : 0);
   const transcriptFilterCount =
     selectedTranscriptLangs.length +
@@ -122,7 +127,8 @@ export function AssetFilters({
     hasTranscriptRecordFilter ||
     dateSearchFilter ||
     dateFromFilter ||
-    dateToFilter;
+    dateToFilter ||
+    locationCountryFilter;
 
   return (
     <form className="rounded-lg border p-4" method="GET">
@@ -205,6 +211,36 @@ export function AssetFilters({
           </div>
         </div>
       </CollapsibleFilterSection>
+
+      {/* Location Filters - Hidden for now, backend logic still available */}
+      {/* {availableLocationCountries.length > 0 && (
+        <CollapsibleFilterSection
+          title="Location Filters"
+          badge={locationFilterCount}
+          defaultOpen={locationFilterCount > 0}
+        >
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-2">
+              <label className="text-xs font-medium mb-1 block">Country (All Sources)</label>
+              <select
+                name="locationCountry"
+                defaultValue={locationCountryFilter}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
+              >
+                <option value="">All Countries</option>
+                {availableLocationCountries.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Searches event venue, host org location, and raw metadata
+              </p>
+            </div>
+          </div>
+        </CollapsibleFilterSection>
+      )} */}
 
       {/* Processing & Publication Filters */}
       <CollapsibleFilterSection
