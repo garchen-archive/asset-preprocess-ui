@@ -30,6 +30,7 @@ export default async function AssetsPage({
     dateSearch?: string;
     dateFrom?: string;
     dateTo?: string;
+    locationCountry?: string;
     sortBy?: string;
     sortOrder?: string;
     page?: string;
@@ -85,6 +86,7 @@ export default async function AssetsPage({
   const dateSearchFilter = searchParams.dateSearch || "";
   const dateFromFilter = searchParams.dateFrom || "";
   const dateToFilter = searchParams.dateTo || "";
+  const locationCountryFilter = searchParams.locationCountry || "";
 
   const sortBy = searchParams.sortBy || "createdAt";
   const sortOrder = searchParams.sortOrder || "desc";
@@ -256,6 +258,40 @@ export default async function AssetsPage({
     conditions.push(lte(archiveAssets.createdDate, new Date(dateToFilter)));
   }
 
+  // Unified country filter - checks asset's event's venue location, host org location, OR raw metadata (case-insensitive)
+  if (locationCountryFilter) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM event e
+        WHERE e.id = asset.event_id
+        AND (
+          -- Via event's venue → location → location_address → address
+          EXISTS (
+            SELECT 1 FROM venue v
+            INNER JOIN location l ON l.id = v.location_id
+            INNER JOIN location_address la ON la.location_id = l.id
+            INNER JOIN address a ON a.id = la.address_id
+            WHERE v.id = e.venue_id
+              AND LOWER(a.country) = LOWER(${locationCountryFilter})
+          )
+          OR
+          -- Via event's host org → org_location → location → location_address → address
+          EXISTS (
+            SELECT 1 FROM organization_location ol
+            INNER JOIN location l ON l.id = ol.location_id
+            INNER JOIN location_address la ON la.location_id = l.id
+            INNER JOIN address a ON a.id = la.address_id
+            WHERE ol.organization_id = e.host_organization_id
+              AND LOWER(a.country) = LOWER(${locationCountryFilter})
+          )
+          OR
+          -- Via event's raw metadata country_raw (nested under sheetImport)
+          LOWER(e.additional_metadata->'sheetImport'->>'country_raw') = LOWER(${locationCountryFilter})
+        )
+      )`
+    );
+  }
+
   // Get total count for pagination
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -324,8 +360,41 @@ export default async function AssetsPage({
       return Array.from(allLangs).sort();
     });
 
+  // Get available countries from events associated with assets (structured + raw metadata, case-normalized)
+  const availableLocationCountries = await db.execute(sql`
+    SELECT DISTINCT INITCAP(LOWER(country)) AS country FROM (
+      -- Countries from asset's event's venue
+      SELECT a.country
+      FROM asset ast
+      INNER JOIN event e ON e.id = ast.event_id
+      INNER JOIN venue v ON v.id = e.venue_id
+      INNER JOIN location l ON l.id = v.location_id
+      INNER JOIN location_address la ON la.location_id = l.id
+      INNER JOIN address a ON a.id = la.address_id
+      WHERE a.country IS NOT NULL AND a.country != ''
+      UNION
+      -- Countries from asset's event's host organization
+      SELECT a.country
+      FROM asset ast
+      INNER JOIN event e ON e.id = ast.event_id
+      INNER JOIN organization_location ol ON ol.organization_id = e.host_organization_id
+      INNER JOIN location l ON l.id = ol.location_id
+      INNER JOIN location_address la ON la.location_id = l.id
+      INNER JOIN address a ON a.id = la.address_id
+      WHERE a.country IS NOT NULL AND a.country != ''
+      UNION
+      -- Countries from asset's event's raw metadata (nested under sheetImport)
+      SELECT e.additional_metadata->'sheetImport'->>'country_raw' AS country
+      FROM asset ast
+      INNER JOIN event e ON e.id = ast.event_id
+      WHERE e.additional_metadata->'sheetImport'->>'country_raw' IS NOT NULL
+        AND e.additional_metadata->'sheetImport'->>'country_raw' != ''
+    ) AS combined_countries
+    ORDER BY country
+  `).then(result => (result as unknown as { country: string }[]).map(r => r.country).filter(Boolean));
+
   // Get statistics for counters (only when no filters applied - excludeFilter must be empty/"All")
-  const showStats = !search && !statusFilter && !typeFilter && !sourceFilter && !isMediaFileFilter && !safeToDeleteFilter && excludeFilter === "" && selectedFormats.length === 0 && !hasOralTranslationFilter && selectedInterpreterLangs.length === 0 && selectedTranscriptLangs.length === 0 && !hasTimestampedTranscriptFilter && !transcriptsAvailableFilter && !needsDetailedReviewFilter && !hasTranscriptRecordFilter && !dateSearchFilter && !dateFromFilter && !dateToFilter;
+  const showStats = !search && !statusFilter && !typeFilter && !sourceFilter && !isMediaFileFilter && !safeToDeleteFilter && excludeFilter === "" && selectedFormats.length === 0 && !hasOralTranslationFilter && selectedInterpreterLangs.length === 0 && selectedTranscriptLangs.length === 0 && !hasTimestampedTranscriptFilter && !transcriptsAvailableFilter && !needsDetailedReviewFilter && !hasTranscriptRecordFilter && !dateSearchFilter && !dateFromFilter && !dateToFilter && !locationCountryFilter;
   let stats = null;
 
   if (showStats) {
@@ -476,6 +545,8 @@ export default async function AssetsPage({
         dateSearchFilter={dateSearchFilter}
         dateFromFilter={dateFromFilter}
         dateToFilter={dateToFilter}
+        locationCountryFilter={locationCountryFilter}
+        availableLocationCountries={availableLocationCountries}
       />
 
       {/* Results Info */}
@@ -511,6 +582,7 @@ export default async function AssetsPage({
           ...(dateSearchFilter && { dateSearch: dateSearchFilter }),
           ...(dateFromFilter && { dateFrom: dateFromFilter }),
           ...(dateToFilter && { dateTo: dateToFilter }),
+          ...(locationCountryFilter && { locationCountry: locationCountryFilter }),
         }}
       />
 
@@ -538,6 +610,7 @@ export default async function AssetsPage({
           ...(dateSearchFilter && { dateSearch: dateSearchFilter }),
           ...(dateFromFilter && { dateFrom: dateFromFilter }),
           ...(dateToFilter && { dateTo: dateToFilter }),
+          ...(locationCountryFilter && { locationCountry: locationCountryFilter }),
         }}
       />
     </div>

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { events, organizations, topics, categories, eventTopics, eventCategories } from "@/lib/db/schema";
-import { asc, desc, eq, and, sql, gte, lte, exists, inArray } from "drizzle-orm";
+import { events, organizations, topics, categories, eventTopics, eventCategories, venues, locations, locationAddresses, addresses, organizationLocations } from "@/lib/db/schema";
+import { asc, desc, eq, and, sql, gte, lte, exists, inArray, or } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/pagination";
@@ -22,6 +22,7 @@ export default async function EventsPage({
     organizer?: string;
     hostingCenter?: string;
     country?: string;
+    locationCountry?: string;
     locationRaw?: string;
     metadataSearch?: string;
     dateFrom?: string;
@@ -43,6 +44,7 @@ export default async function EventsPage({
   const organizerFilter = searchParams.organizer || "";
   const hostingCenterFilter = searchParams.hostingCenter || "";
   const countryFilter = searchParams.country || "";
+  const locationCountryFilter = searchParams.locationCountry || "";
   const locationRawFilter = searchParams.locationRaw || "";
   const metadataSearch = searchParams.metadataSearch || "";
   const dateFromFilter = searchParams.dateFrom || "";
@@ -116,7 +118,37 @@ export default async function EventsPage({
   }
 
   if (countryFilter) {
-    conditions.push(sql`${events.additionalMetadata}->>'country_raw' = ${countryFilter}`);
+    conditions.push(sql`LOWER(${events.additionalMetadata}->'sheetImport'->>'country_raw') = LOWER(${countryFilter})`);
+  }
+
+  // Unified country filter - checks venue location, host org location, OR raw metadata (case-insensitive)
+  if (locationCountryFilter) {
+    conditions.push(
+      sql`(
+        -- Via venue → location → location_address → address
+        EXISTS (
+          SELECT 1 FROM venue v
+          INNER JOIN location l ON l.id = v.location_id
+          INNER JOIN location_address la ON la.location_id = l.id
+          INNER JOIN address a ON a.id = la.address_id
+          WHERE v.id = event.venue_id
+            AND LOWER(a.country) = LOWER(${locationCountryFilter})
+        )
+        OR
+        -- Via host org → org_location → location → location_address → address
+        EXISTS (
+          SELECT 1 FROM organization_location ol
+          INNER JOIN location l ON l.id = ol.location_id
+          INNER JOIN location_address la ON la.location_id = l.id
+          INNER JOIN address a ON a.id = la.address_id
+          WHERE ol.organization_id = event.host_organization_id
+            AND LOWER(a.country) = LOWER(${locationCountryFilter})
+        )
+        OR
+        -- Via raw metadata country_raw (nested under sheetImport)
+        LOWER(event.additional_metadata->'sheetImport'->>'country_raw') = LOWER(${locationCountryFilter})
+      )`
+    );
   }
 
   if (locationRawFilter) {
@@ -266,7 +298,7 @@ export default async function EventsPage({
     .offset(offset);
 
   // Fetch distinct values for filter dropdowns + organizations for bulk edit
-  const [types, organizers, hostingCenters, countries, locationTexts, allOrganizations, distinctTopics, distinctCategories] = await Promise.all([
+  const [types, organizers, hostingCenters, countries, locationCountries, locationTexts, allOrganizations, distinctTopics, distinctCategories] = await Promise.all([
     // Distinct event types
     db
       .selectDistinct({ type: events.eventType })
@@ -290,14 +322,44 @@ export default async function EventsPage({
       .where(sql`${events.additionalMetadata}->>'hosting_center' IS NOT NULL AND ${events.additionalMetadata}->>'hosting_center' != ''`)
       .orderBy(sql`${events.additionalMetadata}->>'hosting_center'`),
 
-    // Distinct country_raw values from additional_metadata
+    // Distinct country_raw values from additional_metadata (case-normalized, nested under sheetImport)
     db
       .selectDistinct({
-        value: sql<string>`${events.additionalMetadata}->>'country_raw'`,
+        value: sql<string>`INITCAP(LOWER(${events.additionalMetadata}->'sheetImport'->>'country_raw'))`,
       })
       .from(events)
-      .where(sql`${events.additionalMetadata}->>'country_raw' IS NOT NULL AND ${events.additionalMetadata}->>'country_raw' != ''`)
-      .orderBy(sql`${events.additionalMetadata}->>'country_raw'`),
+      .where(sql`${events.additionalMetadata}->'sheetImport'->>'country_raw' IS NOT NULL AND ${events.additionalMetadata}->'sheetImport'->>'country_raw' != ''`)
+      .orderBy(sql`INITCAP(LOWER(${events.additionalMetadata}->'sheetImport'->>'country_raw'))`),
+
+    // Distinct countries from structured address data AND raw metadata (combined, case-normalized)
+    db.execute(sql`
+      SELECT DISTINCT INITCAP(LOWER(country)) AS country FROM (
+        -- Countries from event venues
+        SELECT a.country
+        FROM event e
+        INNER JOIN venue v ON v.id = e.venue_id
+        INNER JOIN location l ON l.id = v.location_id
+        INNER JOIN location_address la ON la.location_id = l.id
+        INNER JOIN address a ON a.id = la.address_id
+        WHERE a.country IS NOT NULL AND a.country != ''
+        UNION
+        -- Countries from host organization locations
+        SELECT a.country
+        FROM event e
+        INNER JOIN organization_location ol ON ol.organization_id = e.host_organization_id
+        INNER JOIN location l ON l.id = ol.location_id
+        INNER JOIN location_address la ON la.location_id = l.id
+        INNER JOIN address a ON a.id = la.address_id
+        WHERE a.country IS NOT NULL AND a.country != ''
+        UNION
+        -- Countries from raw metadata (nested under sheetImport)
+        SELECT e.additional_metadata->'sheetImport'->>'country_raw' AS country
+        FROM event e
+        WHERE e.additional_metadata->'sheetImport'->>'country_raw' IS NOT NULL
+          AND e.additional_metadata->'sheetImport'->>'country_raw' != ''
+      ) AS combined_countries
+      ORDER BY country
+    `),
 
     // Distinct location_raw values from additional_metadata
     db
@@ -354,6 +416,7 @@ export default async function EventsPage({
         organizerFilter={organizerFilter}
         hostingCenterFilter={hostingCenterFilter}
         countryFilter={countryFilter}
+        locationCountryFilter={locationCountryFilter}
         locationRawFilter={locationRawFilter}
         metadataSearch={metadataSearch}
         dateFromFilter={dateFromFilter}
@@ -365,6 +428,7 @@ export default async function EventsPage({
         availableOrganizers={allOrganizations}
         availableHostingCenters={hostingCenters.map((h) => h.value).filter(Boolean)}
         availableCountries={countries.map((c) => c.value).filter(Boolean)}
+        availableLocationCountries={(locationCountries as unknown as { country: string }[]).map((r) => r.country).filter(Boolean)}
         availableLocationTexts={locationTexts.map((l) => l.value).filter(Boolean)}
         availableTopics={distinctTopics}
         availableCategories={distinctCategories}
@@ -401,6 +465,7 @@ export default async function EventsPage({
           ...(organizerFilter && { organizer: organizerFilter }),
           ...(hostingCenterFilter && { hostingCenter: hostingCenterFilter }),
           ...(countryFilter && { country: countryFilter }),
+          ...(locationCountryFilter && { locationCountry: locationCountryFilter }),
           ...(locationRawFilter && { locationRaw: locationRawFilter }),
           ...(metadataSearch && { metadataSearch }),
           ...(dateFromFilter && { dateFrom: dateFromFilter }),
