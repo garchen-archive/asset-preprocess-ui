@@ -109,7 +109,7 @@ export default function StorageImportPage() {
       <Breadcrumbs items={breadcrumbItems} />
 
       <div>
-        <h1 className="text-3xl font-bold">Storage Import</h1>
+        <h1 className="text-3xl font-bold">Asset Import</h1>
         <p className="text-muted-foreground">
           Import files from cloud storage into the archive database
         </p>

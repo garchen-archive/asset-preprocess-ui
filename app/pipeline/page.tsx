@@ -14,7 +14,7 @@ export default function PipelinePage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Storage Import */}
+        {/* Asset Import */}
         <div className="rounded-lg border p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
@@ -22,7 +22,7 @@ export default function PipelinePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold">Storage Import</h2>
+            <h2 className="text-xl font-semibold">Asset Import</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
             Import files from Backblaze, Google Drive, or S3 into the archive database.
