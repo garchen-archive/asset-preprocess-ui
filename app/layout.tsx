@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { UserMenu } from "@/components/user-menu";
+import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -86,6 +87,7 @@ export default function RootLayout({
             </div>
           </nav>
           <main className="container mx-auto px-4 py-8">{children}</main>
+          <Toaster />
         </SessionProvider>
       </body>
     </html>

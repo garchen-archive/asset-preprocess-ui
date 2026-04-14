@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
+import { useToast } from "@/components/ui/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 
-type ImportMode = "single" | "folder";
+type ImportMode = "single" | "folder" | "upload";
 type Provider = "backblaze" | "gdrive";
 
 interface ImportResult {
@@ -31,10 +34,125 @@ export default function StorageImportPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
+  // Upload mode state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Pipeline", href: "/pipeline" },
     { label: "Import" },
   ];
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    setUploading(true);
+    setResult(null);
+
+    // Show initial toast
+    const { id, update, dismiss } = toast({
+      title: "Uploading file...",
+      description: selectedFile.name,
+      duration: Infinity, // Don't auto-dismiss during upload
+    });
+
+    try {
+      // 1. Upload file
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("provider", provider);
+
+      const uploadRes = await fetch("/api/pipeline/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        const errorData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errorData.error || "Upload failed");
+      }
+      const uploadData = await uploadRes.json();
+
+      // 2. Trigger import
+      update({
+        id,
+        title: "Processing...",
+        description: "Creating asset record",
+      });
+
+      const importRes = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: "/api/v1/storage/import",
+          method: "POST",
+          data: {
+            provider,
+            file_id: uploadData.key,
+            extract_metadata: extractMetadata,
+            trigger_ingestion: triggerIngestion,
+          },
+        }),
+      });
+
+      const importData = await importRes.json();
+
+      if (!importRes.ok || importData.status >= 400) {
+        throw new Error(importData.data?.error || importData.error || "Import failed");
+      }
+
+      // 3. Show success
+      const assetId = importData.data?.asset?.id;
+      const isCreated = importData.status === 201;
+      const isUpdated = importData.status === 200;
+
+      update({
+        id,
+        title: "Upload complete!",
+        description: "Asset created successfully",
+        action: assetId ? (
+          <ToastAction altText="View asset" asChild>
+            <Link href={`/assets/${assetId}`}>View Asset</Link>
+          </ToastAction>
+        ) : undefined,
+        duration: 5000,
+      });
+
+      // Update result panel
+      setResult({
+        success: true,
+        message: isCreated
+          ? "New asset created successfully!"
+          : isUpdated
+            ? "Existing asset updated."
+            : "File uploaded and imported successfully!",
+        data: importData.data,
+        jobId: importData.data?.job_id,
+      });
+
+      // Clear file selection
+      setSelectedFile(null);
+
+    } catch (error: any) {
+      update({
+        id,
+        title: "Upload failed",
+        description: error.message,
+        variant: "destructive",
+        duration: 5000,
+      });
+
+      // Update result panel with error
+      setResult({
+        success: false,
+        message: error.message || "Upload failed",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleImport = async () => {
     setLoading(true);
@@ -129,6 +247,13 @@ export default function StorageImportPage() {
         >
           Folder
         </Button>
+        <Button
+          variant={mode === "upload" ? "default" : "outline"}
+          onClick={() => setMode("upload")}
+        >
+          <UploadCloud className="h-4 w-4 mr-2" />
+          Upload File
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -136,7 +261,7 @@ export default function StorageImportPage() {
         <div className="rounded-lg border p-6 space-y-6">
           <div>
             <h2 className="text-xl font-semibold mb-4">
-              {mode === "single" ? "Import Single File" : "Import Folder"}
+              {mode === "single" ? "Import Single File" : mode === "folder" ? "Import Folder" : "Upload File"}
             </h2>
 
             {/* Provider Selection */}
@@ -156,8 +281,56 @@ export default function StorageImportPage() {
               </div>
             </div>
 
+            {/* Upload Mode - File Drop Zone */}
+            {mode === "upload" && (
+              <div className="space-y-4 mb-4">
+                <div
+                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+                    isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setIsDragging(false);
+                    const file = e.dataTransfer.files[0];
+                    if (file) setSelectedFile(file);
+                  }}
+                >
+                  <input
+                    type="file"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    accept=".mp4,.mov,.mp3,.wav,.m4a,.mkv,.avi"
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    {selectedFile ? (
+                      <div>
+                        <p className="font-medium">{selectedFile.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {(selectedFile.size / 1024 / 1024).toFixed(1)} MB
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Click or drop to change file
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <p className="mt-2">Drop a file here or click to browse</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Supports: .mp4, .mov, .mp3, .wav, .m4a, .mkv, .avi
+                        </p>
+                      </div>
+                    )}
+                  </label>
+                </div>
+              </div>
+            )}
+
             {/* File/Folder ID */}
-            {mode === "single" ? (
+            {mode === "single" && (
               <div className="space-y-2 mb-4">
                 <Label htmlFor="fileId">
                   {provider === "gdrive" ? "File ID" : "Object Key (path)"}
@@ -178,7 +351,9 @@ export default function StorageImportPage() {
                     : "The full path/key to the file in the bucket"}
                 </p>
               </div>
-            ) : (
+            )}
+
+            {mode === "folder" && (
               <>
                 <div className="space-y-2 mb-4">
                   <Label htmlFor="folderId">
@@ -264,29 +439,41 @@ export default function StorageImportPage() {
             </div>
           </div>
 
-          <Button
-            onClick={handleImport}
-            disabled={loading || (mode === "single" ? !fileId : !folderId)}
-            className="w-full"
-          >
-            {loading ? "Processing..." : dryRun ? "Preview Files" : "Import"}
-          </Button>
+          {mode === "upload" ? (
+            <Button
+              onClick={handleUpload}
+              disabled={uploading || !selectedFile}
+              className="w-full"
+            >
+              {uploading ? "Uploading..." : "Upload"}
+            </Button>
+          ) : (
+            <Button
+              onClick={handleImport}
+              disabled={loading || (mode === "single" ? !fileId : !folderId)}
+              className="w-full"
+            >
+              {loading ? "Processing..." : dryRun ? "Preview Files" : "Import"}
+            </Button>
+          )}
         </div>
 
         {/* Results */}
         <div className="rounded-lg border p-6">
           <h2 className="text-xl font-semibold mb-4">Result</h2>
 
-          {!result && !loading && (
+          {!result && !loading && !uploading && (
             <div className="text-center py-12 text-muted-foreground">
               <p>Import results will appear here</p>
             </div>
           )}
 
-          {loading && (
+          {(loading || uploading) && (
             <div className="text-center py-12">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-              <p className="mt-4 text-muted-foreground">Processing...</p>
+              <p className="mt-4 text-muted-foreground">
+                {uploading ? "Uploading..." : "Processing..."}
+              </p>
             </div>
           )}
 
@@ -323,20 +510,29 @@ export default function StorageImportPage() {
                 </div>
               )}
 
-              {result.data?.asset && (
+              {(result.data?.asset || result.data?.asset_id) && (
                 <div className="space-y-2">
                   <h3 className="font-medium">Asset Created/Updated</h3>
                   <div className="text-sm space-y-1">
-                    <p><span className="text-muted-foreground">ID:</span> <code className="font-mono">{result.data.asset.id}</code></p>
-                    {result.data.asset.title && (
-                      <p><span className="text-muted-foreground">Title:</span> {result.data.asset.title}</p>
+                    <p>
+                      <span className="text-muted-foreground">ID:</span>{" "}
+                      <code className="font-mono">{result.data.asset?.id || result.data.asset_id}</code>
+                    </p>
+                    {(result.data.asset?.title || result.data.name) && (
+                      <p>
+                        <span className="text-muted-foreground">Name:</span>{" "}
+                        {result.data.asset?.title || result.data.name}
+                      </p>
                     )}
-                    {result.data.asset.filepath && (
-                      <p><span className="text-muted-foreground">Path:</span> <code className="font-mono text-xs">{result.data.asset.filepath}</code></p>
+                    {(result.data.asset?.filepath || result.data.filepath) && (
+                      <p>
+                        <span className="text-muted-foreground">Path:</span>{" "}
+                        <code className="font-mono text-xs">{result.data.asset?.filepath || result.data.filepath}</code>
+                      </p>
                     )}
                   </div>
                   <Link
-                    href={`/assets/${result.data.asset.id}`}
+                    href={`/assets/${result.data.asset?.id || result.data.asset_id}`}
                     className="text-sm text-blue-600 hover:underline"
                   >
                     View asset →
