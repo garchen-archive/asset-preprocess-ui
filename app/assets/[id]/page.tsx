@@ -152,13 +152,6 @@ export default async function AssetDetailPage({
               {(() => {
                 const mediaProviderData = data.additionalMetadata?.media_provider as {
                   playback_id?: string;
-                  urls?: {
-                    playback?: string;
-                    thumbnail?: string;
-                    mp4_high?: string;
-                    mp4_medium?: string;
-                    mp4_low?: string;
-                  };
                   duration?: number;
                   aspect_ratio?: string;
                   status?: string;
@@ -200,11 +193,6 @@ export default async function AssetDetailPage({
                     duration?: number;
                     aspect_ratio?: string;
                     status?: string;
-                    urls?: {
-                      mp4_high?: string;
-                      mp4_medium?: string;
-                      mp4_low?: string;
-                    };
                   } | undefined;
 
                   return (
@@ -243,43 +231,6 @@ export default async function AssetDetailPage({
                         <div>
                           <dt className="text-sm font-medium text-muted-foreground">Aspect Ratio</dt>
                           <dd className="text-sm mt-1">{mediaProviderData.aspect_ratio}</dd>
-                        </div>
-                      )}
-                      {mediaProviderData?.urls && (
-                        <div className="md:col-span-2">
-                          <dt className="text-sm font-medium text-muted-foreground mb-2">Download Links</dt>
-                          <dd className="flex flex-wrap gap-2">
-                            {mediaProviderData.urls.mp4_high && (
-                              <a
-                                href={mediaProviderData.urls.mp4_high}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
-                              >
-                                MP4 High
-                              </a>
-                            )}
-                            {mediaProviderData.urls.mp4_medium && (
-                              <a
-                                href={mediaProviderData.urls.mp4_medium}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
-                              >
-                                MP4 Medium
-                              </a>
-                            )}
-                            {mediaProviderData.urls.mp4_low && (
-                              <a
-                                href={mediaProviderData.urls.mp4_low}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center rounded px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200"
-                              >
-                                MP4 Low
-                              </a>
-                            )}
-                          </dd>
                         </div>
                       )}
                     </>
