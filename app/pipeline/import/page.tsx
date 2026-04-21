@@ -38,6 +38,7 @@ export default function StorageImportPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadDirectory, setUploadDirectory] = useState("");
   const { toast } = useToast();
 
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -63,6 +64,9 @@ export default function StorageImportPage() {
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("provider", provider);
+      if (uploadDirectory) {
+        formData.append("directory", uploadDirectory);
+      }
 
       const uploadRes = await fetch("/api/pipeline/upload", {
         method: "POST",
@@ -325,6 +329,19 @@ export default function StorageImportPage() {
                       </div>
                     )}
                   </label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="uploadDirectory">Directory Path (optional)</Label>
+                  <Input
+                    id="uploadDirectory"
+                    value={uploadDirectory}
+                    onChange={(e) => setUploadDirectory(e.target.value)}
+                    placeholder="media/2024/videos"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Storage path prefix. Leave empty to upload to root.
+                  </p>
                 </div>
               </div>
             )}

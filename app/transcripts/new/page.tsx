@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib/db/schema";
-import { or, eq, inArray, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
 
@@ -11,43 +11,38 @@ export default async function NewTranscriptPage({
 }: {
   searchParams: { mediaAssetId?: string; canonicalAssetId?: string };
 }) {
-  // Fetch media assets (video/audio)
-  const mediaAssets = await db
-    .select({
-      id: archiveAssets.id,
-      name: archiveAssets.name,
-      title: archiveAssets.title,
-      assetType: archiveAssets.assetType,
-    })
-    .from(archiveAssets)
-    .where(
-      or(
-        eq(archiveAssets.assetType, "video"),
-        eq(archiveAssets.assetType, "audio")
-      )
-    )
-    .orderBy(archiveAssets.name)
-    .limit(1000);
+  // Fetch initial assets if IDs are provided (for pre-selection)
+  let initialMediaAsset = null;
+  let initialCanonicalAsset = null;
 
-  // Fetch transcript file assets (subtitle/document)
-  const transcriptAssets = await db
-    .select({
-      id: archiveAssets.id,
-      name: archiveAssets.name,
-      title: archiveAssets.title,
-      assetType: archiveAssets.assetType,
-      fileFormat: archiveAssets.fileFormat,
-    })
-    .from(archiveAssets)
-    .where(
-      or(
-        eq(archiveAssets.assetType, "subtitle"),
-        eq(archiveAssets.assetType, "document"),
-        inArray(archiveAssets.fileFormat, ["srt", "vtt", "txt", "doc", "docx", "pdf"])
-      )
-    )
-    .orderBy(archiveAssets.name)
-    .limit(1000);
+  if (searchParams.mediaAssetId) {
+    const [asset] = await db
+      .select({
+        id: archiveAssets.id,
+        name: archiveAssets.name,
+        title: archiveAssets.title,
+        assetType: archiveAssets.assetType,
+      })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.id, searchParams.mediaAssetId))
+      .limit(1);
+    initialMediaAsset = asset || null;
+  }
+
+  if (searchParams.canonicalAssetId) {
+    const [asset] = await db
+      .select({
+        id: archiveAssets.id,
+        name: archiveAssets.name,
+        title: archiveAssets.title,
+        assetType: archiveAssets.assetType,
+        fileFormat: archiveAssets.fileFormat,
+      })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.id, searchParams.canonicalAssetId))
+      .limit(1);
+    initialCanonicalAsset = asset || null;
+  }
 
   // Fetch event sessions for linking
   const eventSessions = await db
@@ -96,10 +91,10 @@ export default async function NewTranscriptPage({
       {/* Form */}
       <TranscriptForm
         mode="create"
-        mediaAssets={mediaAssets}
-        transcriptAssets={transcriptAssets}
         eventSessions={eventSessions}
         eventSessionAssets={sessionAssets}
+        initialMediaAsset={initialMediaAsset}
+        initialCanonicalAsset={initialCanonicalAsset}
         defaultMediaAssetId={searchParams.mediaAssetId}
         defaultCanonicalAssetId={searchParams.canonicalAssetId}
         cancelHref="/transcripts"
