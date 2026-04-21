@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { transcripts, archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib/db/schema";
-import { eq, or, inArray, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
@@ -23,10 +23,10 @@ export default async function EditTranscriptPage({
     notFound();
   }
 
-  // Fetch media asset info (if set)
-  let mediaAsset = null;
+  // Fetch initial media asset info (if set) for display in async select
+  let initialMediaAsset = null;
   if (transcript.mediaAssetId) {
-    const [asset] = await db
+    const [assetData] = await db
       .select({
         id: archiveAssets.id,
         name: archiveAssets.name,
@@ -36,28 +36,25 @@ export default async function EditTranscriptPage({
       .from(archiveAssets)
       .where(eq(archiveAssets.id, transcript.mediaAssetId))
       .limit(1);
-    mediaAsset = asset || null;
+    initialMediaAsset = assetData || null;
   }
 
-  // Fetch transcript file assets (subtitle/document)
-  const transcriptAssets = await db
-    .select({
-      id: archiveAssets.id,
-      name: archiveAssets.name,
-      title: archiveAssets.title,
-      assetType: archiveAssets.assetType,
-      fileFormat: archiveAssets.fileFormat,
-    })
-    .from(archiveAssets)
-    .where(
-      or(
-        eq(archiveAssets.assetType, "subtitle"),
-        eq(archiveAssets.assetType, "document"),
-        inArray(archiveAssets.fileFormat, ["srt", "vtt", "txt", "doc", "docx", "pdf"])
-      )
-    )
-    .orderBy(archiveAssets.name)
-    .limit(1000);
+  // Fetch initial canonical asset info (if set) for display in async select
+  let initialCanonicalAsset = null;
+  if (transcript.canonicalAssetId) {
+    const [assetData] = await db
+      .select({
+        id: archiveAssets.id,
+        name: archiveAssets.name,
+        title: archiveAssets.title,
+        assetType: archiveAssets.assetType,
+        fileFormat: archiveAssets.fileFormat,
+      })
+      .from(archiveAssets)
+      .where(eq(archiveAssets.id, transcript.canonicalAssetId))
+      .limit(1);
+    initialCanonicalAsset = assetData || null;
+  }
 
   // Fetch event sessions for linking
   const eventSessions = await db
@@ -108,11 +105,10 @@ export default async function EditTranscriptPage({
       <TranscriptForm
         mode="edit"
         transcript={transcript}
-        mediaAssets={[]}
-        transcriptAssets={transcriptAssets}
         eventSessions={eventSessions}
         eventSessionAssets={sessionAssets}
-        linkedMediaAsset={mediaAsset}
+        initialMediaAsset={initialMediaAsset}
+        initialCanonicalAsset={initialCanonicalAsset}
         cancelHref={`/transcripts/${params.id}`}
       />
     </div>

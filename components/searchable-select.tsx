@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 interface OptionItem {
   value: string;
   label: string;
+  searchTerms?: string; // Additional terms to search against (e.g., filename, description)
 }
 
 interface SearchableSelectProps {
@@ -43,7 +44,8 @@ export function SearchableSelect({
     if (!search) return normalizedOptions;
     const searchLower = search.toLowerCase();
     return normalizedOptions.filter((opt) =>
-      opt.label.toLowerCase().includes(searchLower)
+      opt.label.toLowerCase().includes(searchLower) ||
+      (opt.searchTerms && opt.searchTerms.toLowerCase().includes(searchLower))
     );
   }, [normalizedOptions, search]);
 

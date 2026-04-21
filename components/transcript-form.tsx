@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/searchable-select";
+import { AsyncSearchableSelect } from "@/components/async-searchable-select";
 import { createTranscript, updateTranscript } from "@/lib/actions";
 
 const LANGUAGE_OPTIONS = [
@@ -57,21 +58,6 @@ const PUBLICATION_STATUS_OPTIONS = [
   { value: "archived", label: "Archived" },
 ];
 
-type MediaAsset = {
-  id: string;
-  name: string | null;
-  title: string | null;
-  assetType: string | null;
-};
-
-type TranscriptAsset = {
-  id: string;
-  name: string | null;
-  title: string | null;
-  assetType: string | null;
-  fileFormat: string | null;
-};
-
 type EventSessionOption = {
   id: string;
   sessionName: string;
@@ -112,11 +98,11 @@ type TranscriptData = {
 interface TranscriptFormProps {
   mode: "create" | "edit";
   transcript?: TranscriptData;
-  mediaAssets: MediaAsset[];
-  transcriptAssets: TranscriptAsset[];
   eventSessions?: EventSessionOption[];
   eventSessionAssets?: EventSessionAssetOption[];
-  linkedMediaAsset?: MediaAsset | null;
+  // For displaying initially selected assets (edit mode)
+  initialMediaAsset?: { id: string; name: string | null; title: string | null; assetType: string | null } | null;
+  initialCanonicalAsset?: { id: string; name: string | null; title: string | null; assetType: string | null; fileFormat: string | null } | null;
   defaultMediaAssetId?: string;
   defaultCanonicalAssetId?: string;
   cancelHref: string;
@@ -125,17 +111,17 @@ interface TranscriptFormProps {
 export function TranscriptForm({
   mode,
   transcript,
-  mediaAssets,
-  transcriptAssets,
   eventSessions = [],
   eventSessionAssets = [],
-  linkedMediaAsset,
+  initialMediaAsset,
+  initialCanonicalAsset,
   defaultMediaAssetId,
   defaultCanonicalAssetId,
   cancelHref,
 }: TranscriptFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
   const [mediaAssetId, setMediaAssetId] = useState(
@@ -163,16 +149,14 @@ export function TranscriptForm({
   const [notes, setNotes] = useState(transcript?.notes || "");
   const [changeNote, setChangeNote] = useState("");
 
-  // Convert assets to searchable options
-  const mediaAssetOptions = mediaAssets.map((asset) => ({
-    value: asset.id,
-    label: `${asset.title || asset.name} (${asset.assetType})`,
-  }));
+  // Initial options for async selects (for displaying currently selected values)
+  const initialMediaOption = initialMediaAsset
+    ? { value: initialMediaAsset.id, label: `${initialMediaAsset.title || initialMediaAsset.name} (${initialMediaAsset.assetType})` }
+    : null;
 
-  const transcriptAssetOptions = transcriptAssets.map((asset) => ({
-    value: asset.id,
-    label: `${asset.title || asset.name} (${asset.fileFormat || asset.assetType})`,
-  }));
+  const initialCanonicalOption = initialCanonicalAsset
+    ? { value: initialCanonicalAsset.id, label: `${initialCanonicalAsset.title || initialCanonicalAsset.name} (${initialCanonicalAsset.fileFormat || initialCanonicalAsset.assetType})` }
+    : null;
 
   const eventSessionOptions = eventSessions.map((session) => ({
     value: session.id,
@@ -201,6 +185,7 @@ export function TranscriptForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     const formData = new FormData();
     formData.set("mediaAssetId", mediaAssetId);
@@ -219,7 +204,12 @@ export function TranscriptForm({
 
     if (mode === "create") {
       formData.set("createdBy", createdBy);
-      await createTranscript(formData);
+      const result = await createTranscript(formData);
+      if (result?.error) {
+        setError(result.error);
+        setIsSubmitting(false);
+        return;
+      }
     } else if (transcript) {
       formData.set("editedBy", editedBy);
       formData.set("changeNote", changeNote);
@@ -229,12 +219,20 @@ export function TranscriptForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Error Display */}
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-800">
+          <p className="font-medium">Error</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
       {/* Session Association */}
       <div className="rounded-lg border p-6">
         <h2 className="text-xl font-semibold mb-4">Session</h2>
         <div className="space-y-4">
           <div>
-            <Label htmlFor="eventSessionId">Event Session *</Label>
+            <Label htmlFor="eventSessionId">Event Session</Label>
             <SearchableSelect
               options={eventSessionOptions}
               value={eventSessionId}
@@ -243,8 +241,8 @@ export function TranscriptForm({
               name="eventSessionId"
               emptyLabel="Select session..."
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              The event session this transcript belongs to.
+<p className="text-xs text-muted-foreground mt-1">
+              Optional. The event session this transcript belongs to.
             </p>
           </div>
 
@@ -274,13 +272,15 @@ export function TranscriptForm({
         <div className="space-y-4">
           <div>
             <Label htmlFor="canonicalAssetId">Canonical Asset</Label>
-            <SearchableSelect
-              options={transcriptAssetOptions}
+            <AsyncSearchableSelect
+              searchEndpoint="/api/search/assets?type=transcript"
               value={canonicalAssetId}
               onChange={setCanonicalAssetId}
-              placeholder="Search transcript files..."
+              placeholder="Type to search transcript files..."
               name="canonicalAssetId"
               emptyLabel="None"
+              initialOption={initialCanonicalOption}
+              minChars={2}
             />
             <p className="text-xs text-muted-foreground mt-1">
               The subtitle or document asset containing the transcript text (SRT, VTT, TXT, DOCX, etc.).
@@ -289,13 +289,15 @@ export function TranscriptForm({
 
           <div>
             <Label htmlFor="mediaAssetId">Media Asset</Label>
-            <SearchableSelect
-              options={mediaAssetOptions}
+            <AsyncSearchableSelect
+              searchEndpoint="/api/search/assets?type=media"
               value={mediaAssetId}
               onChange={setMediaAssetId}
-              placeholder="Search media assets..."
+              placeholder="Type to search media assets..."
               name="mediaAssetId"
               emptyLabel="None"
+              initialOption={initialMediaOption}
+              minChars={2}
             />
             <p className="text-xs text-muted-foreground mt-1">
               Optional. Only populate when transcript timing is aligned to a specific file variant

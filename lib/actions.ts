@@ -1510,7 +1510,7 @@ export async function importOrganizationsFromCSV(rows: CSVRow[]) {
 // TRANSCRIPT ACTIONS
 // ============================================================================
 
-export async function createTranscript(formData: FormData) {
+export async function createTranscript(formData: FormData): Promise<{ error: string } | undefined> {
   const data = {
     mediaAssetId: (formData.get("mediaAssetId") as string) || null,
     canonicalAssetId: (formData.get("canonicalAssetId") as string) || null,
@@ -1528,20 +1528,37 @@ export async function createTranscript(formData: FormData) {
     notes: (formData.get("notes") as string) || null,
   };
 
-  const [newTranscript] = await db.insert(transcripts).values(data).returning();
+  try {
+    const [newTranscript] = await db.insert(transcripts).values(data).returning();
 
-  // Create initial revision
-  await db.insert(transcriptRevisions).values({
-    transcriptId: newTranscript.id,
-    canonicalAssetId: data.canonicalAssetId,
-    versionNumber: 1,
-    editedBy: data.createdBy,
-    changeNote: "Initial creation",
-    statusSnapshot: data.publicationStatus,
-  });
+    // Create initial revision
+    await db.insert(transcriptRevisions).values({
+      transcriptId: newTranscript.id,
+      canonicalAssetId: data.canonicalAssetId,
+      versionNumber: 1,
+      editedBy: data.createdBy,
+      changeNote: "Initial creation",
+      statusSnapshot: data.publicationStatus,
+    });
 
-  revalidatePath("/transcripts");
-  redirect(`/transcripts/${newTranscript.id}`);
+    revalidatePath("/transcripts");
+    redirect(`/transcripts/${newTranscript.id}`);
+  } catch (error: any) {
+    // Re-throw redirect errors (these are not actual errors)
+    if (error?.message === 'NEXT_REDIRECT' || error?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw error;
+    }
+
+    console.error('Create transcript error:', error);
+
+    if (error?.code === '23505') {
+      return { error: 'A duplicate transcript already exists.' };
+    }
+    if (error?.code === '23503') {
+      return { error: 'Referenced asset or session not found. Please check your selections.' };
+    }
+    return { error: `Failed to create transcript: ${error?.message || 'Please try again.'}` };
+  }
 }
 
 export async function updateTranscript(id: string, formData: FormData) {

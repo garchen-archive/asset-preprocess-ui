@@ -8,6 +8,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get("file");
     const provider = formData.get("provider") || "backblaze";
+    const directory = formData.get("directory");
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest) {
     const pipelineFormData = new FormData();
     pipelineFormData.append("file", file);
     pipelineFormData.append("provider", provider as string);
+    if (directory) {
+      pipelineFormData.append("directory", directory as string);
+    }
 
     // Forward to pipeline API (let fetch set the Content-Type with boundary)
     const response = await fetch(`${PIPELINE_API_URL}/api/v1/storage/upload`, {
