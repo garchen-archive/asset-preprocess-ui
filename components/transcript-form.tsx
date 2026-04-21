@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -122,6 +122,7 @@ export function TranscriptForm({
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false); // Ref for synchronous double-submit prevention
 
   // Form state
   const [mediaAssetId, setMediaAssetId] = useState(
@@ -184,6 +185,9 @@ export function TranscriptForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Prevent double submission using ref (synchronous check)
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
@@ -208,6 +212,7 @@ export function TranscriptForm({
       if (result?.error) {
         setError(result.error);
         setIsSubmitting(false);
+        submittingRef.current = false; // Allow retry on error
         return;
       }
     } else if (transcript) {
