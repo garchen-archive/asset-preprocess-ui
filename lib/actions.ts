@@ -1,7 +1,10 @@
 "use server";
 
 import { db } from "@/lib/db/client";
-import { archiveAssets, events, sessions, topics, categories, eventTopics, eventCategories, sessionTopics, sessionCategories, locations, addresses, locationAddresses, organizations, organizationLocations, venues, transcripts, transcriptRevisions } from "@/lib/db/schema";
+import { archiveAssets, events, sessions, topics, categories, eventTopics, eventCategories, sessionTopics, sessionCategories, locations, addresses, locationAddresses, organizations, organizationLocations, venues, transcripts, transcriptRevisions, users, credentials } from "@/lib/db/schema";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 import { eq, sql, inArray, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -1681,4 +1684,154 @@ export async function bulkDeleteTranscripts(transcriptIds: string[]) {
     console.error("Bulk delete transcripts error:", error);
     return { success: false, error: error.message || "Failed to delete transcripts" };
   }
+}
+
+// ============================================================================
+// USER MANAGEMENT ACTIONS (Admin only)
+// ============================================================================
+
+async function requireAdmin(): Promise<{ error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return { error: "Not authenticated" };
+  }
+  if ((session.user as any).role !== "admin") {
+    return { error: "Admin access required" };
+  }
+  return {};
+}
+
+export async function createUser(formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) return adminCheck;
+
+  const name = formData.get("name") as string;
+  const email = (formData.get("email") as string) || null;
+  const username = formData.get("username") as string;
+  const password = formData.get("password") as string;
+  const role = (formData.get("role") as string) || "editor";
+
+  if (!name || !username || !password) {
+    return { error: "Name, username, and password are required" };
+  }
+
+  if (password.length < 6) {
+    return { error: "Password must be at least 6 characters" };
+  }
+
+  try {
+    // Check if username already exists
+    const [existingCred] = await db
+      .select({ id: credentials.id })
+      .from(credentials)
+      .where(eq(credentials.username, username))
+      .limit(1);
+
+    if (existingCred) {
+      return { error: "Username already exists" };
+    }
+
+    // Create user
+    const [newUser] = await db.insert(users).values({
+      name,
+      email,
+      role,
+    }).returning();
+
+    // Create credentials
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await db.insert(credentials).values({
+      userId: newUser.id,
+      username,
+      password: hashedPassword,
+    });
+
+    revalidatePath("/users");
+    redirect("/users");
+  } catch (error: any) {
+    if (error?.message === 'NEXT_REDIRECT' || error?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw error;
+    }
+    console.error("Create user error:", error);
+    return { error: `Failed to create user: ${error?.message || "Unknown error"}` };
+  }
+
+  return { success: true };
+}
+
+export async function updateUser(id: string, formData: FormData): Promise<{ error?: string; success?: boolean }> {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) return adminCheck;
+
+  const name = formData.get("name") as string;
+  const email = (formData.get("email") as string) || null;
+  const role = (formData.get("role") as string) || "editor";
+  const newPassword = formData.get("newPassword") as string;
+
+  if (!name) {
+    return { error: "Name is required" };
+  }
+
+  try {
+    // Update user
+    await db.update(users).set({
+      name,
+      email,
+      role,
+      updatedAt: new Date(),
+    }).where(eq(users.id, id));
+
+    // Update password if provided
+    if (newPassword && newPassword.length > 0) {
+      if (newPassword.length < 6) {
+        return { error: "Password must be at least 6 characters" };
+      }
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      await db.update(credentials).set({
+        password: hashedPassword,
+        updatedAt: new Date(),
+      }).where(eq(credentials.userId, id));
+    }
+
+    revalidatePath("/users");
+    revalidatePath(`/users/${id}`);
+    redirect(`/users/${id}`);
+  } catch (error: any) {
+    if (error?.message === 'NEXT_REDIRECT' || error?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw error;
+    }
+    console.error("Update user error:", error);
+    return { error: `Failed to update user: ${error?.message || "Unknown error"}` };
+  }
+
+  return { success: true };
+}
+
+export async function deleteUser(id: string): Promise<{ error?: string; success?: boolean }> {
+  const adminCheck = await requireAdmin();
+  if (adminCheck.error) return adminCheck;
+
+  // Prevent self-deletion
+  const session = await getServerSession(authOptions);
+  if (session?.user && (session.user as any).id === id) {
+    return { error: "You cannot delete your own account" };
+  }
+
+  try {
+    // Delete credentials first (foreign key)
+    await db.delete(credentials).where(eq(credentials.userId, id));
+    // Delete user
+    await db.delete(users).where(eq(users.id, id));
+
+    revalidatePath("/users");
+    redirect("/users");
+  } catch (error: any) {
+    if (error?.message === 'NEXT_REDIRECT' || error?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw error;
+    }
+    console.error("Delete user error:", error);
+    return { error: `Failed to delete user: ${error?.message || "Unknown error"}` };
+  }
+
+  return { success: true };
 }
