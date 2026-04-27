@@ -40,7 +40,6 @@ const statusColors: Record<string, string> = {
 
 const jobTypeColors: Record<string, string> = {
   ingest: "bg-cyan-50 text-cyan-700 border-cyan-200",
-  transcode: "bg-purple-50 text-purple-700 border-purple-200",
   transcribe: "bg-orange-50 text-orange-700 border-orange-200",
   translate: "bg-pink-50 text-pink-700 border-pink-200",
   publish: "bg-green-50 text-green-700 border-green-200",
@@ -221,7 +220,6 @@ function JobsContent() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="ingest">Ingest</option>
-                <option value="transcode">Transcode</option>
                 <option value="transcribe">Transcribe</option>
                 <option value="translate">Translate</option>
                 <option value="publish">Publish</option>
@@ -283,7 +281,6 @@ function JobsContent() {
           >
             <option value="">All</option>
             <option value="ingest">Ingest</option>
-            <option value="transcode">Transcode</option>
             <option value="transcribe">Transcribe</option>
             <option value="translate">Translate</option>
             <option value="publish">Publish</option>
