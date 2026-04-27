@@ -546,11 +546,9 @@ export default async function AssetDetailPage({
                 <dd className="text-sm mt-1">
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      data.processingStatus === "transcribed"
+                      data.processingStatus === "transcoded"
                         ? "bg-green-100 text-green-700"
-                        : data.processingStatus === "transcoded"
-                        ? "bg-teal-100 text-teal-700"
-                        : data.processingStatus === "ingesting" || data.processingStatus === "transcribing"
+                        : data.processingStatus === "ingesting"
                         ? "bg-blue-100 text-blue-700"
                         : data.processingStatus === "queued"
                         ? "bg-purple-100 text-purple-700"
@@ -559,7 +557,7 @@ export default async function AssetDetailPage({
                         : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    {data.processingStatus || "raw"}
+                    {data.processingStatus || "imported"}
                   </span>
                 </dd>
               </div>
@@ -569,13 +567,7 @@ export default async function AssetDetailPage({
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
                       data.publicationStatus === "published"
-                        ? "bg-purple-100 text-purple-700"
-                        : data.publicationStatus === "approved"
                         ? "bg-green-100 text-green-700"
-                        : data.publicationStatus === "in_review"
-                        ? "bg-blue-100 text-blue-700"
-                        : data.publicationStatus === "needs_work"
-                        ? "bg-orange-100 text-orange-700"
                         : data.publicationStatus === "archived"
                         ? "bg-slate-100 text-slate-700"
                         : "bg-gray-100 text-gray-700"

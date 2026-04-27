@@ -35,21 +35,16 @@ interface AssetFiltersProps {
 }
 
 const PROCESSING_STATUS_OPTIONS = [
-  { value: "raw", label: "Raw" },
+  { value: "imported", label: "Imported" },
   { value: "queued", label: "Queued" },
   { value: "ingesting", label: "Ingesting" },
   { value: "transcoded", label: "Transcoded" },
-  { value: "transcribing", label: "Transcribing" },
-  { value: "transcribed", label: "Transcribed" },
   { value: "failed", label: "Failed" },
 ];
 
 const PUBLICATION_STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
-  { value: "in_review", label: "In Review" },
-  { value: "approved", label: "Approved" },
   { value: "published", label: "Published" },
-  { value: "needs_work", label: "Needs Work" },
   { value: "archived", label: "Archived" },
 ];
 

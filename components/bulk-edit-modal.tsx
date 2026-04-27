@@ -12,21 +12,16 @@ interface BulkEditModalProps {
 }
 
 const PROCESSING_STATUS_OPTIONS = [
-  { value: "raw", label: "Raw" },
+  { value: "imported", label: "Imported" },
   { value: "queued", label: "Queued" },
   { value: "ingesting", label: "Ingesting" },
   { value: "transcoded", label: "Transcoded" },
-  { value: "transcribing", label: "Transcribing" },
-  { value: "transcribed", label: "Transcribed" },
   { value: "failed", label: "Failed" },
 ];
 
 const PUBLICATION_STATUS_OPTIONS = [
   { value: "draft", label: "Draft" },
-  { value: "in_review", label: "In Review" },
-  { value: "approved", label: "Approved" },
   { value: "published", label: "Published" },
-  { value: "needs_work", label: "Needs Work" },
   { value: "archived", label: "Archived" },
 ];
 
@@ -75,7 +70,7 @@ export function BulkEditModal({
   const [oralTranslationLanguages, setOralTranslationLanguages] = useState<string[]>([]);
   const [interpreterName, setInterpreterName] = useState("");
   const [contributorOrg, setContributorOrg] = useState("");
-  const [processingStatus, setProcessingStatus] = useState("raw");
+  const [processingStatus, setProcessingStatus] = useState("imported");
   const [publicationStatus, setPublicationStatus] = useState("draft");
   const [needsDetailedReview, setNeedsDetailedReview] = useState(false);
   const [transcriptAvailable, setTranscriptAvailable] = useState(false);

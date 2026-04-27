@@ -52,7 +52,7 @@ export async function updateAsset(id: string, formData: FormData) {
     transcriptLocation: formData.get("transcriptLocation") as string || null,
 
     // Processing
-    processingStatus: formData.get("processingStatus") as string || "raw",
+    processingStatus: formData.get("processingStatus") as string || "imported",
     publicationStatus: formData.get("publicationStatus") as string || "draft",
     needsDetailedReview: formData.get("needsDetailedReview") === "on",
 

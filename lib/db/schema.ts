@@ -21,11 +21,12 @@ export type Program = typeof program.$inferSelect;
 export type NewProgram = typeof program.$inferInsert;
 
 // ============================================================================
-// ASSET (formerly archive_assets)
-// File layer - represents physical files
+// ASSET LEGACY VIEW
+// Backward-compatible view of normalized asset tables
+// Use this for UI queries - it JOINs asset with media_detail, asset_external_ref
 // ============================================================================
 
-export const asset = pgTable("asset", {
+export const asset = pgTable("asset_legacy", {
   // Primary key and source tracking
   id: uuid("id").defaultRandom().primaryKey(),
   metadataSource: text("metadata_source").notNull(),
@@ -40,6 +41,8 @@ export const asset = pgTable("asset", {
   fileSizeBytes: integer("file_size_bytes"),
   fileSizeMb: real("file_size_mb"),
   duration: text("duration"),
+  durationSeconds: integer("duration_seconds"),
+  language: text("language"),
 
   // 2. CONTENT
   title: text("title"),
@@ -72,8 +75,8 @@ export const asset = pgTable("asset", {
   // Note: teaching segments now stored in additional_metadata as teaching_segments array
 
   // PROCESSING FIELDS
-  processingStatus: text("processing_status").default("raw"), // raw, queued, ingesting, transcoded, transcribing, transcribed, failed
-  publicationStatus: text("publication_status").notNull().default("draft"), // draft, in_review, approved, published, needs_work, archived
+  processingStatus: text("processing_status").default("imported"), // imported, queued, ingesting, transcoded, failed
+  publicationStatus: text("publication_status").notNull().default("draft"), // draft, published, archived
   needsDetailedReview: boolean("needs_detailed_review").default(false),
 
   // 5. ADMINISTRATIVE
@@ -140,6 +143,12 @@ export const asset = pgTable("asset", {
 
   // Additional metadata (flexible JSON storage)
   additionalMetadata: jsonb("additional_metadata").$type<Record<string, any>>(),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+
+  // New classification fields (from asset schema redesign)
+  assetCategory: text("asset_category"), // media, subtitle, document, image, data
+  parentAssetId: uuid("parent_asset_id"),
+  mimeType: text("mime_type"),
 });
 
 export type Asset = typeof asset.$inferSelect;
@@ -149,6 +158,155 @@ export type NewAsset = typeof asset.$inferInsert;
 export const archiveAssets = asset;
 export type ArchiveAsset = Asset;
 export type NewArchiveAsset = NewAsset;
+
+// ============================================================================
+// MEDIA DETAIL (video/audio specs)
+// Type-specific metadata for video and audio assets
+// ============================================================================
+
+export const mediaDetail = pgTable("media_detail", {
+  assetId: uuid("asset_id").primaryKey(),
+
+  // Duration
+  duration: text("duration"),
+  durationSeconds: integer("duration_seconds"),
+
+  // Video specs
+  resolution: text("resolution"),
+  videoCodec: text("video_codec"),
+  videoCodecDescription: text("video_codec_description"),
+  frameRate: text("frame_rate"),
+
+  // Audio specs
+  audioCodec: text("audio_codec"),
+  audioCodecDescription: text("audio_codec_description"),
+  sampleRate: text("sample_rate"),
+  audioChannels: text("audio_channels"),
+  bitrate: text("bitrate"),
+
+  // Quality
+  overallQuality: text("overall_quality"),
+  audioQuality: text("audio_quality"),
+  videoQuality: text("video_quality"),
+  audioQualityIssues: text("audio_quality_issues"),
+  videoQualityIssues: text("video_quality_issues"),
+
+  // Content
+  language: text("language"),
+  originalDate: timestamp("original_date"),
+  contentCategory: text("content_category"),
+  description: text("description"),
+
+  // Platform data
+  platformData: jsonb("platform_data").$type<Record<string, any>>(),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type MediaDetail = typeof mediaDetail.$inferSelect;
+export type NewMediaDetail = typeof mediaDetail.$inferInsert;
+
+// ============================================================================
+// SUBTITLE DETAIL (SRT/VTT metadata)
+// ============================================================================
+
+export const subtitleDetail = pgTable("subtitle_detail", {
+  assetId: uuid("asset_id").primaryKey(),
+
+  language: text("language").notNull(),
+  format: text("format").notNull(), // srt, vtt, ttml
+  lineCount: integer("line_count"),
+  wordCount: integer("word_count"),
+  encoding: text("encoding").default("utf-8"),
+  generatedBy: text("generated_by"), // whisper, manual, hybrid
+  reviewedAt: timestamp("reviewed_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type SubtitleDetail = typeof subtitleDetail.$inferSelect;
+export type NewSubtitleDetail = typeof subtitleDetail.$inferInsert;
+
+// ============================================================================
+// DOCUMENT DETAIL (PDF/DOCX metadata)
+// ============================================================================
+
+export const documentDetail = pgTable("document_detail", {
+  assetId: uuid("asset_id").primaryKey(),
+
+  language: text("language"),
+  pageCount: integer("page_count"),
+  wordCount: integer("word_count"),
+  author: text("author"),
+  documentType: text("document_type"), // transcript, notes, commentary, schedule
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type DocumentDetail = typeof documentDetail.$inferSelect;
+export type NewDocumentDetail = typeof documentDetail.$inferInsert;
+
+// ============================================================================
+// IMAGE DETAIL (thumbnails, posters)
+// ============================================================================
+
+export const imageDetail = pgTable("image_detail", {
+  assetId: uuid("asset_id").primaryKey(),
+
+  width: integer("width"),
+  height: integer("height"),
+  aspectRatio: text("aspect_ratio"),
+  colorSpace: text("color_space"),
+  imageType: text("image_type"), // thumbnail, poster, screenshot, cover
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type ImageDetail = typeof imageDetail.$inferSelect;
+export type NewImageDetail = typeof imageDetail.$inferInsert;
+
+// ============================================================================
+// ASSET EXTERNAL REF (provider references)
+// Links assets to external providers (gdrive, mux, youtube, backblaze)
+// ============================================================================
+
+export const assetExternalRef = pgTable("asset_external_ref", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  assetId: uuid("asset_id").notNull(),
+
+  // Provider identification
+  provider: text("provider").notNull(), // gdrive, mux, youtube, backblaze
+  providerCategory: text("provider_category").notNull(), // source, media, publication, storage
+  externalId: text("external_id").notNull(),
+  secondaryId: text("secondary_id"), // e.g., Mux playback_id
+
+  // Status
+  status: text("status").default("active"),
+  isPrimary: boolean("is_primary").default(false),
+
+  // URLs
+  url: text("url"),
+  streamUrl: text("stream_url"),
+  downloadUrl: text("download_url"),
+
+  // Versioned metadata
+  schemaVersion: text("schema_version").default("1.0"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+
+  // Sync tracking
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastWebhookAt: timestamp("last_webhook_at"),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type AssetExternalRef = typeof assetExternalRef.$inferSelect;
+export type NewAssetExternalRef = typeof assetExternalRef.$inferInsert;
 
 // ============================================================================
 // EVENT (formerly events)
@@ -601,9 +759,30 @@ export const transcript = pgTable("transcript", {
   timecodeStatus: text("timecode_status").default("none"),   // none, partial, full
   source: text("source"),                                    // asr, human, hybrid
 
-  // Workflow
+  // Workflow (legacy)
   publicationStatus: text("publication_status").notNull().default("draft"), // draft, in_review, approved, published, needs_work, archived
   version: integer("version").notNull().default(1),
+
+  // V2 Workflow (stage-based editorial workflow)
+  stage: text("stage").notNull().default("editor_review"), // transcription, translation, editor_review, eic_review, approved, synced
+  stageStatus: text("stage_status").notNull().default("pending"), // pending, in_progress, revision_requested
+  assignedTo: uuid("assigned_to"), // User currently assigned
+  assignedAt: timestamp("assigned_at"),
+
+  // Subtitle provider (for syncing to video platforms)
+  subtitleProvider: text("subtitle_provider"), // mux, etc.
+  subtitleTrackId: text("subtitle_track_id"),
+  subtitleUrl: text("subtitle_url"),
+  syncedAt: timestamp("synced_at"),
+
+  // Visibility and approval
+  isVisible: boolean("is_visible").notNull().default(false),
+  approvedBy: uuid("approved_by"),
+  approvedAt: timestamp("approved_at"),
+  revisionNotes: text("revision_notes"),
+
+  // Content
+  content: text("content"), // Transcript text content (may include SRT format)
 
   // Attribution
   createdBy: text("created_by"),
