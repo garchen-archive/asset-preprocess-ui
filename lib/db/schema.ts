@@ -22,8 +22,9 @@ export type NewProgram = typeof program.$inferInsert;
 
 // ============================================================================
 // ASSET LEGACY VIEW
-// Backward-compatible view of normalized asset tables
-// Use this for UI queries - it JOINs asset with media_detail, asset_external_ref
+// Backward-compatible view that exposes asset columns for UI queries.
+// Type-specific metadata (duration, codecs, resolution, etc.) stored in JSONB `metadata` column.
+// External provider refs (gdrive, mux, youtube, backblaze) in asset_external_ref table.
 // ============================================================================
 
 export const asset = pgTable("asset_legacy", {
@@ -160,118 +161,9 @@ export type ArchiveAsset = Asset;
 export type NewArchiveAsset = NewAsset;
 
 // ============================================================================
-// MEDIA DETAIL (video/audio specs)
-// Type-specific metadata for video and audio assets
-// ============================================================================
-
-export const mediaDetail = pgTable("media_detail", {
-  assetId: uuid("asset_id").primaryKey(),
-
-  // Duration
-  duration: text("duration"),
-  durationSeconds: integer("duration_seconds"),
-
-  // Video specs
-  resolution: text("resolution"),
-  videoCodec: text("video_codec"),
-  videoCodecDescription: text("video_codec_description"),
-  frameRate: text("frame_rate"),
-
-  // Audio specs
-  audioCodec: text("audio_codec"),
-  audioCodecDescription: text("audio_codec_description"),
-  sampleRate: text("sample_rate"),
-  audioChannels: text("audio_channels"),
-  bitrate: text("bitrate"),
-
-  // Quality
-  overallQuality: text("overall_quality"),
-  audioQuality: text("audio_quality"),
-  videoQuality: text("video_quality"),
-  audioQualityIssues: text("audio_quality_issues"),
-  videoQualityIssues: text("video_quality_issues"),
-
-  // Content
-  language: text("language"),
-  originalDate: timestamp("original_date"),
-  contentCategory: text("content_category"),
-  description: text("description"),
-
-  // Platform data
-  platformData: jsonb("platform_data").$type<Record<string, any>>(),
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export type MediaDetail = typeof mediaDetail.$inferSelect;
-export type NewMediaDetail = typeof mediaDetail.$inferInsert;
-
-// ============================================================================
-// SUBTITLE DETAIL (SRT/VTT metadata)
-// ============================================================================
-
-export const subtitleDetail = pgTable("subtitle_detail", {
-  assetId: uuid("asset_id").primaryKey(),
-
-  language: text("language").notNull(),
-  format: text("format").notNull(), // srt, vtt, ttml
-  lineCount: integer("line_count"),
-  wordCount: integer("word_count"),
-  encoding: text("encoding").default("utf-8"),
-  generatedBy: text("generated_by"), // whisper, manual, hybrid
-  reviewedAt: timestamp("reviewed_at"),
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export type SubtitleDetail = typeof subtitleDetail.$inferSelect;
-export type NewSubtitleDetail = typeof subtitleDetail.$inferInsert;
-
-// ============================================================================
-// DOCUMENT DETAIL (PDF/DOCX metadata)
-// ============================================================================
-
-export const documentDetail = pgTable("document_detail", {
-  assetId: uuid("asset_id").primaryKey(),
-
-  language: text("language"),
-  pageCount: integer("page_count"),
-  wordCount: integer("word_count"),
-  author: text("author"),
-  documentType: text("document_type"), // transcript, notes, commentary, schedule
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export type DocumentDetail = typeof documentDetail.$inferSelect;
-export type NewDocumentDetail = typeof documentDetail.$inferInsert;
-
-// ============================================================================
-// IMAGE DETAIL (thumbnails, posters)
-// ============================================================================
-
-export const imageDetail = pgTable("image_detail", {
-  assetId: uuid("asset_id").primaryKey(),
-
-  width: integer("width"),
-  height: integer("height"),
-  aspectRatio: text("aspect_ratio"),
-  colorSpace: text("color_space"),
-  imageType: text("image_type"), // thumbnail, poster, screenshot, cover
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export type ImageDetail = typeof imageDetail.$inferSelect;
-export type NewImageDetail = typeof imageDetail.$inferInsert;
-
-// ============================================================================
 // ASSET EXTERNAL REF (provider references)
 // Links assets to external providers (gdrive, mux, youtube, backblaze)
+// Provider categories: source (raw files), media (streaming), publication (public), storage (archival)
 // ============================================================================
 
 export const assetExternalRef = pgTable("asset_external_ref", {
