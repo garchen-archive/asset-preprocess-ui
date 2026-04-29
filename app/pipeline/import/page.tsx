@@ -90,7 +90,7 @@ export default function StorageImportPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: "/api/v1/assets/import",
+          endpoint: "/api/v1/admin/assets/import",
           method: "POST",
           data: {
             provider,
@@ -184,7 +184,7 @@ export default function StorageImportPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: "/api/v1/assets/import",
+          endpoint: "/api/v1/admin/assets/import",
           method: "POST",
           data,
         }),
