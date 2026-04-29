@@ -17,73 +17,143 @@ function parseCoord(value: string | null): number | null {
 }
 
 export async function updateAsset(id: string, formData: FormData) {
-  // Parse additional metadata JSON
-  let additionalMetadata = null;
-  const additionalMetadataStr = formData.get("additionalMetadata") as string;
-  if (additionalMetadataStr && additionalMetadataStr.trim()) {
-    try {
-      additionalMetadata = JSON.parse(additionalMetadataStr);
-    } catch (e) {
-      // If JSON is invalid, ignore it
-      console.error("Invalid JSON in additionalMetadata:", e);
-    }
-  }
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
 
   // Parse transcript languages (multiple checkboxes)
   const transcriptLanguages = formData.getAll("transcriptLanguages") as string[];
 
-  const data = {
-    title: formData.get("title") as string || null,
-    category: formData.get("category") as string || null,
-    descriptionSummary: formData.get("descriptionSummary") as string || null,
-    additionalTopics: formData.get("additionalTopics") as string || null,
+  // Build the update request for pipeline API
+  // Maps form fields to pipeline API's UpdateAssetRequest + Metadata structure
+  const updateRequest: Record<string, any> = {};
 
-    // Translation
-    hasOralTranslation: formData.get("hasOralTranslation") === "on",
-    interpreterName: formData.get("interpreterName") as string || null,
-    hasTibetanTranscription: formData.get("hasTibetanTranscription") === "on",
-    hasWrittenTranslation: formData.get("hasWrittenTranslation") === "on",
-    hasSubtitleFiles: formData.get("hasSubtitleFiles") === "on",
+  // Direct fields
+  const title = formData.get("title") as string;
+  if (title) updateRequest.title = title;
 
-    // Transcript
-    transcriptAvailable: formData.get("transcriptAvailable") === "on",
-    transcriptTimestamped: formData.get("transcriptTimestamped") as string || "No",
-    transcriptLanguages: transcriptLanguages.length > 0 ? transcriptLanguages : null,
-    transcriptLocation: formData.get("transcriptLocation") as string || null,
+  const description = formData.get("descriptionSummary") as string;
+  if (description) updateRequest.description = description;
 
-    // Processing
-    processingStatus: formData.get("processingStatus") as string || "imported",
-    publicationStatus: formData.get("publicationStatus") as string || "draft",
-    needsDetailedReview: formData.get("needsDetailedReview") === "on",
+  // Build metadata for curation fields
+  const metadata: Record<string, any> = { curation: {} };
 
-    // Quality
-    audioQuality: formData.get("audioQuality") as string || null,
-    videoQuality: formData.get("videoQuality") as string || null,
-    audioQualityIssues: formData.get("audioQualityIssues") as string || null,
-    videoQualityIssues: formData.get("videoQualityIssues") as string || null,
-    needsEditing: formData.get("needsEditing") === "on",
+  // Event assignment (moved to metadata.curation.event)
+  // Check if fields are present in form (even if empty) to support unassignment
+  const hasEventIdField = formData.has("eventId");
+  const hasEventSessionIdField = formData.has("eventSessionId");
+  const eventId = formData.get("eventId") as string;
+  const eventSessionId = formData.get("eventSessionId") as string;
 
-    // Administrative - Event or Session assignment (mutually exclusive)
-    eventId: formData.get("eventId") as string || null,
-    eventSessionId: formData.get("eventSessionId") as string || null,
-    catalogingStatus: formData.get("catalogingStatus") as string || null,
-    catalogedBy: formData.get("catalogedBy") as string || null,
-    backedUpLocally: formData.get("backedUpLocally") === "on",
-    safeToDeleteFromGdrive: formData.get("safeToDeleteFromGdrive") === "on",
-    exclude: formData.get("exclude") === "on",
-    contributorOrg: formData.get("contributorOrg") as string || null,
-    notes: formData.get("notes") as string || null,
+  if (hasEventIdField || hasEventSessionIdField) {
+    // Send explicit null to clear assignment, or the value to set it
+    metadata.curation.event = {
+      event_id: eventId || null,
+      event_session_id: eventSessionId || null,
+    };
+  }
 
-    // Additional metadata
-    additionalMetadata,
+  // Content
+  const category = formData.get("category") as string;
+  const additionalTopics = formData.get("additionalTopics") as string;
+  const contributorOrg = formData.get("contributorOrg") as string;
+  if (category || additionalTopics || contributorOrg) {
+    metadata.curation.content = {
+      ...(category && { category }),
+      ...(additionalTopics && { topics: additionalTopics }),
+      ...(contributorOrg && { contributor: contributorOrg }),
+    };
+  }
 
-    updatedAt: new Date(),
-  };
+  // Translation
+  const hasOralTranslation = formData.get("hasOralTranslation") === "on";
+  const interpreterName = formData.get("interpreterName") as string;
+  const hasTibetanTranscription = formData.get("hasTibetanTranscription") === "on";
+  const hasWrittenTranslation = formData.get("hasWrittenTranslation") === "on";
+  const hasSubtitleFiles = formData.get("hasSubtitleFiles") === "on";
+  if (hasOralTranslation || interpreterName || hasTibetanTranscription || hasWrittenTranslation || hasSubtitleFiles) {
+    metadata.curation.translation = {
+      has_oral: hasOralTranslation,
+      ...(interpreterName && { interpreter: interpreterName }),
+      has_tibetan_transcription: hasTibetanTranscription,
+      has_written: hasWrittenTranslation,
+      has_subtitles: hasSubtitleFiles,
+    };
+  }
 
-  await db
-    .update(archiveAssets)
-    .set(data)
-    .where(eq(archiveAssets.id, id));
+  // Transcript
+  const transcriptAvailable = formData.get("transcriptAvailable") === "on";
+  const transcriptTimestamped = formData.get("transcriptTimestamped") as string;
+  const transcriptLocation = formData.get("transcriptLocation") as string;
+  if (transcriptAvailable || transcriptTimestamped || transcriptLanguages.length > 0 || transcriptLocation) {
+    metadata.curation.transcript = {
+      available: transcriptAvailable,
+      ...(transcriptTimestamped && { timestamped: transcriptTimestamped.toLowerCase() }),
+      ...(transcriptLanguages.length > 0 && { languages: transcriptLanguages }),
+      ...(transcriptLocation && { location: transcriptLocation }),
+    };
+  }
+
+  // Quality
+  const audioQuality = formData.get("audioQuality") as string;
+  const videoQuality = formData.get("videoQuality") as string;
+  const audioQualityIssues = formData.get("audioQualityIssues") as string;
+  const videoQualityIssues = formData.get("videoQualityIssues") as string;
+  const needsEditing = formData.get("needsEditing") === "on";
+  if (audioQuality || videoQuality || audioQualityIssues || videoQualityIssues || needsEditing) {
+    metadata.curation.quality = {
+      ...(audioQuality && { audio: audioQuality }),
+      ...(videoQuality && { video: videoQuality }),
+      ...(audioQualityIssues && { audio_issues: [audioQualityIssues] }),
+      ...(videoQualityIssues && { video_issues: [videoQualityIssues] }),
+      needs_editing: needsEditing,
+    };
+  }
+
+  // Workflow
+  const catalogingStatus = formData.get("catalogingStatus") as string;
+  const catalogedBy = formData.get("catalogedBy") as string;
+  const needsDetailedReview = formData.get("needsDetailedReview") === "on";
+  const exclude = formData.get("exclude") === "on";
+  const notes = formData.get("notes") as string;
+  if (catalogingStatus || catalogedBy || needsDetailedReview || exclude || notes) {
+    metadata.curation.workflow = {
+      ...(catalogingStatus && { status: catalogingStatus.toLowerCase().replace(/ /g, '_') }),
+      ...(catalogedBy && { by: catalogedBy }),
+      needs_review: needsDetailedReview,
+      exclude: exclude,
+      ...(notes && { notes }),
+    };
+  }
+
+  // Backup
+  const backedUpLocally = formData.get("backedUpLocally") === "on";
+  const safeToDeleteFromGdrive = formData.get("safeToDeleteFromGdrive") === "on";
+  if (backedUpLocally || safeToDeleteFromGdrive) {
+    metadata.curation.backup = {
+      local: backedUpLocally,
+      safe_to_delete_source: safeToDeleteFromGdrive,
+    };
+  }
+
+  // Add metadata if we have any curation data
+  if (Object.keys(metadata.curation).length > 0) {
+    updateRequest.metadata = metadata;
+  }
+
+  // Call pipeline API
+  const response = await fetch(`${PIPELINE_API_URL}/api/v1/assets/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": PIPELINE_API_KEY,
+    },
+    body: JSON.stringify(updateRequest),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to update asset" }));
+    throw new Error(error.message || "Failed to update asset");
+  }
 
   revalidatePath(`/assets/${id}`);
   redirect(`/assets/${id}`);
@@ -1124,26 +1194,65 @@ export async function bulkAssignAssets({
   assetIds,
   eventId,
   eventSessionId,
+  unassign = false,
 }: {
   assetIds: string[];
   eventId: string | null;
   eventSessionId: string | null;
+  unassign?: boolean;
 }) {
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
+
   try {
-    // Validate that we have either eventId or eventSessionId, but not both
-    if ((eventId && eventSessionId) || (!eventId && !eventSessionId)) {
+    // Validate: either unassign, or have exactly one of eventId/eventSessionId
+    if (!unassign && ((eventId && eventSessionId) || (!eventId && !eventSessionId))) {
       return { success: false, error: "Must specify either event or session, but not both" };
     }
 
-    // Update all selected assets
-    await db
-      .update(archiveAssets)
-      .set({
-        eventId: eventId || null,
-        eventSessionId: eventSessionId || null,
-        updatedAt: new Date(),
+    // Build the update request for pipeline API
+    // For unassign, send explicit nulls to clear the assignment
+    const updateRequest = {
+      metadata: {
+        curation: {
+          event: unassign
+            ? { event_id: null, event_session_id: null }
+            : {
+                event_id: eventId || null,
+                event_session_id: eventSessionId || null,
+              },
+        },
+      },
+    };
+
+    // Update each asset via pipeline API
+    const results = await Promise.allSettled(
+      assetIds.map(async (id) => {
+        const response = await fetch(`${PIPELINE_API_URL}/api/v1/assets/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": PIPELINE_API_KEY,
+          },
+          body: JSON.stringify(updateRequest),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ message: "Failed to assign asset" }));
+          throw new Error(error.message || "Failed to assign asset");
+        }
+        return id;
       })
-      .where(inArray(archiveAssets.id, assetIds));
+    );
+
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      console.error("Some assets failed to assign:", failures);
+      return {
+        success: false,
+        error: `Failed to assign ${failures.length} of ${assetIds.length} assets`,
+      };
+    }
 
     revalidatePath("/assets");
     return { success: true };
@@ -1164,7 +1273,6 @@ export async function bulkUpdateAssets({
     oralTranslationLanguages?: string[] | null;
     interpreterName?: string | null;
     contributorOrg?: string | null;
-    processingStatus?: string | null;
     needsDetailedReview?: boolean | null;
     transcriptAvailable?: boolean | null;
     transcriptTimestamped?: string | null;
@@ -1178,29 +1286,110 @@ export async function bulkUpdateAssets({
     assetType?: string | null;
   };
 }) {
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
+
   try {
     if (!assetIds || assetIds.length === 0) {
       return { success: false, error: "No assets selected" };
     }
 
-    // Filter out undefined values - only update fields that were explicitly set
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    // Build the update request mapping form fields to pipeline API structure
+    const updateRequest: Record<string, any> = {};
+    const metadata: Record<string, any> = { curation: {} };
 
-    for (const [key, value] of Object.entries(updates)) {
-      if (value !== undefined) {
-        updateData[key] = value;
-      }
+    // Direct field: assetType
+    if (updates.assetType !== undefined) {
+      updateRequest.asset_type = updates.assetType;
     }
 
-    // If no fields to update besides updatedAt, return early
-    if (Object.keys(updateData).length <= 1) {
+    // Translation fields
+    if (updates.hasOralTranslation !== undefined || updates.interpreterName !== undefined) {
+      metadata.curation.translation = {
+        ...(updates.hasOralTranslation !== undefined && { has_oral: updates.hasOralTranslation }),
+        ...(updates.interpreterName && { interpreter: updates.interpreterName }),
+      };
+    }
+
+    // Content fields
+    if (updates.contributorOrg !== undefined) {
+      metadata.curation.content = {
+        contributor: updates.contributorOrg,
+      };
+    }
+
+    // Transcript fields
+    if (updates.transcriptAvailable !== undefined || updates.transcriptTimestamped !== undefined || updates.transcriptLanguages !== undefined) {
+      metadata.curation.transcript = {
+        ...(updates.transcriptAvailable !== undefined && { available: updates.transcriptAvailable }),
+        ...(updates.transcriptTimestamped && { timestamped: updates.transcriptTimestamped.toLowerCase() }),
+        ...(updates.transcriptLanguages && updates.transcriptLanguages.length > 0 && { languages: updates.transcriptLanguages }),
+      };
+    }
+
+    // Quality fields
+    if (updates.audioQuality !== undefined || updates.videoQuality !== undefined) {
+      metadata.curation.quality = {
+        ...(updates.audioQuality && { audio: updates.audioQuality }),
+        ...(updates.videoQuality && { video: updates.videoQuality }),
+      };
+    }
+
+    // Workflow fields
+    if (updates.needsDetailedReview !== undefined || updates.catalogingStatus !== undefined || updates.exclude !== undefined) {
+      metadata.curation.workflow = {
+        ...(updates.needsDetailedReview !== undefined && { needs_review: updates.needsDetailedReview }),
+        ...(updates.catalogingStatus && { status: updates.catalogingStatus.toLowerCase().replace(/ /g, '_') }),
+        ...(updates.exclude !== undefined && { exclude: updates.exclude }),
+      };
+    }
+
+    // Backup fields
+    if (updates.safeToDeleteFromGdrive !== undefined || updates.backedUpLocally !== undefined) {
+      metadata.curation.backup = {
+        ...(updates.backedUpLocally !== undefined && { local: updates.backedUpLocally }),
+        ...(updates.safeToDeleteFromGdrive !== undefined && { safe_to_delete_source: updates.safeToDeleteFromGdrive }),
+      };
+    }
+
+    // Add metadata if we have any curation data
+    if (Object.keys(metadata.curation).length > 0) {
+      updateRequest.metadata = metadata;
+    }
+
+    // If no fields to update, return early
+    if (Object.keys(updateRequest).length === 0) {
       return { success: false, error: "No fields to update" };
     }
 
-    await db
-      .update(archiveAssets)
-      .set(updateData)
-      .where(inArray(archiveAssets.id, assetIds));
+    // Update each asset via pipeline API
+    const results = await Promise.allSettled(
+      assetIds.map(async (id) => {
+        const response = await fetch(`${PIPELINE_API_URL}/api/v1/assets/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": PIPELINE_API_KEY,
+          },
+          body: JSON.stringify(updateRequest),
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ message: "Failed to update asset" }));
+          throw new Error(error.message || "Failed to update asset");
+        }
+        return id;
+      })
+    );
+
+    const failures = results.filter((r) => r.status === "rejected");
+    if (failures.length > 0) {
+      console.error("Some assets failed to update:", failures);
+      return {
+        success: false,
+        error: `Failed to update ${failures.length} of ${assetIds.length} assets`,
+      };
+    }
 
     revalidatePath("/assets");
     return { success: true, updatedCount: assetIds.length };

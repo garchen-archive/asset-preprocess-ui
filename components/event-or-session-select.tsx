@@ -155,7 +155,7 @@ export function EventOrSessionSelect({
 
             {/* Hidden input for form submission */}
             <input type="hidden" name="eventId" value={selectedEventId} />
-            <input type="hidden" name="sessionId" value="" />
+            <input type="hidden" name="eventSessionId" value="" />
 
             {/* Dropdown */}
             {isEventDropdownOpen && (
@@ -232,7 +232,7 @@ export function EventOrSessionSelect({
 
             {/* Hidden inputs for form submission */}
             <input type="hidden" name="eventId" value="" />
-            <input type="hidden" name="sessionId" value={selectedSessionId} />
+            <input type="hidden" name="eventSessionId" value={selectedSessionId} />
 
             {/* Dropdown */}
             {isSessionDropdownOpen && (

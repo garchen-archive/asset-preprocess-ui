@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward to pipeline API (let fetch set the Content-Type with boundary)
-    const response = await fetch(`${PIPELINE_API_URL}/api/v1/storage/upload`, {
+    const response = await fetch(`${PIPELINE_API_URL}/api/v1/admin/assets/upload`, {
       method: "POST",
       headers: {
         "X-API-Key": PIPELINE_API_KEY,
