@@ -52,7 +52,7 @@ export async function updateAsset(id: string, formData: FormData) {
     transcriptLocation: formData.get("transcriptLocation") as string || null,
 
     // Processing
-    processingStatus: formData.get("processingStatus") as string || "raw",
+    processingStatus: formData.get("processingStatus") as string || "imported",
     publicationStatus: formData.get("publicationStatus") as string || "draft",
     needsDetailedReview: formData.get("needsDetailedReview") === "on",
 
@@ -90,9 +90,20 @@ export async function updateAsset(id: string, formData: FormData) {
 }
 
 export async function deleteAsset(id: string) {
-  await db
-    .delete(archiveAssets)
-    .where(eq(archiveAssets.id, id));
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
+
+  const response = await fetch(`${PIPELINE_API_URL}/api/v1/assets/${id}?hard=true`, {
+    method: "DELETE",
+    headers: {
+      "X-API-Key": PIPELINE_API_KEY,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: "Failed to delete asset" }));
+    throw new Error(error.message || "Failed to delete asset");
+  }
 
   revalidatePath("/assets");
 }

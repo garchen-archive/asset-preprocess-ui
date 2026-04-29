@@ -61,7 +61,7 @@ export default function PipelinePage() {
             <h2 className="text-xl font-semibold">Jobs</h2>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            Monitor individual processing jobs (ingest, transcode, transcribe, publish).
+            Monitor individual processing jobs (ingest, transcribe, translate, publish).
           </p>
           <Button asChild variant="outline">
             <Link href="/pipeline/jobs">View Jobs</Link>

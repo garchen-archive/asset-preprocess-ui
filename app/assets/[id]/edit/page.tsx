@@ -378,15 +378,13 @@ export default async function AssetEditPage({
               <select
                 id="processingStatus"
                 name="processingStatus"
-                defaultValue={data.processingStatus || "raw"}
+                defaultValue={data.processingStatus || "imported"}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                <option value="raw">Raw</option>
+                <option value="imported">Imported</option>
                 <option value="queued">Queued</option>
                 <option value="ingesting">Ingesting</option>
                 <option value="transcoded">Transcoded</option>
-                <option value="transcribing">Transcribing</option>
-                <option value="transcribed">Transcribed</option>
                 <option value="failed">Failed</option>
               </select>
             </div>
@@ -401,10 +399,7 @@ export default async function AssetEditPage({
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="draft">Draft</option>
-                <option value="in_review">In Review</option>
-                <option value="approved">Approved</option>
                 <option value="published">Published</option>
-                <option value="needs_work">Needs Work</option>
                 <option value="archived">Archived</option>
               </select>
             </div>

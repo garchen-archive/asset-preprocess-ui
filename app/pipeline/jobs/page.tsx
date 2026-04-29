@@ -40,13 +40,12 @@ const statusColors: Record<string, string> = {
 
 const jobTypeColors: Record<string, string> = {
   ingest: "bg-cyan-50 text-cyan-700 border-cyan-200",
-  transcode: "bg-purple-50 text-purple-700 border-purple-200",
   transcribe: "bg-orange-50 text-orange-700 border-orange-200",
   translate: "bg-pink-50 text-pink-700 border-pink-200",
   publish: "bg-green-50 text-green-700 border-green-200",
   sync_transcript: "bg-indigo-50 text-indigo-700 border-indigo-200",
   asset_import: "bg-blue-50 text-blue-700 border-blue-200",
-  folder_import: "bg-teal-50 text-teal-700 border-teal-200",
+  asset_folder_import: "bg-teal-50 text-teal-700 border-teal-200",
 };
 
 function JobsContent() {
@@ -221,7 +220,6 @@ function JobsContent() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="ingest">Ingest</option>
-                <option value="transcode">Transcode</option>
                 <option value="transcribe">Transcribe</option>
                 <option value="translate">Translate</option>
                 <option value="publish">Publish</option>
@@ -283,13 +281,12 @@ function JobsContent() {
           >
             <option value="">All</option>
             <option value="ingest">Ingest</option>
-            <option value="transcode">Transcode</option>
             <option value="transcribe">Transcribe</option>
             <option value="translate">Translate</option>
             <option value="publish">Publish</option>
             <option value="sync_transcript">Sync Transcript</option>
             <option value="asset_import">Asset Import</option>
-            <option value="folder_import">Folder Import</option>
+            <option value="asset_folder_import">Asset Folder Import</option>
           </select>
         </div>
         <div className="flex items-center gap-2">

@@ -8,25 +8,37 @@ import { useRouter } from "next/navigation";
 export function DeleteAssetButton({ id }: { id: string }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const handleDelete = () => {
+    setError(null);
     startTransition(async () => {
-      await deleteAsset(id);
-      router.push("/assets");
-      router.refresh();
+      try {
+        await deleteAsset(id);
+        router.push("/assets");
+        router.refresh();
+      } catch (err: any) {
+        setError(err.message || "Failed to delete asset");
+        setShowConfirm(false);
+      }
     });
   };
 
   if (!showConfirm) {
     return (
-      <Button
-        type="button"
-        variant="destructive"
-        onClick={() => setShowConfirm(true)}
-      >
-        Delete Asset
-      </Button>
+      <div className="space-y-2">
+        {error && (
+          <p className="text-sm text-destructive">{error}</p>
+        )}
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => setShowConfirm(true)}
+        >
+          Delete Asset
+        </Button>
+      </div>
     );
   }
 
