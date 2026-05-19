@@ -1,5 +1,20 @@
+import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
+
+// User editing disabled - managed via CMS
+export default async function EditUserPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  // Redirect to user detail page
+  redirect(`/users/${params.id}`);
+}
+
+/* Original edit page - disabled, user management moved to CMS
 import { db } from "@/lib/db/client";
-import { users, credentials } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
@@ -7,14 +22,11 @@ import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import { UserForm } from "@/components/user-form";
 
-export const dynamic = "force-dynamic";
-
 export default async function EditUserPage({
   params,
 }: {
   params: { id: string };
 }) {
-  // Check admin access
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     redirect("/login");
@@ -23,17 +35,17 @@ export default async function EditUserPage({
     redirect("/");
   }
 
-  // Fetch user with credentials
   const [userData] = await db
     .select({
       id: users.id,
-      name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
-      role: users.role,
-      username: credentials.username,
+      username: users.username,
+      userRole: users.userRole,
+      status: users.status,
     })
     .from(users)
-    .leftJoin(credentials, eq(users.id, credentials.userId))
     .where(eq(users.id, params.id))
     .limit(1);
 
@@ -41,9 +53,10 @@ export default async function EditUserPage({
     notFound();
   }
 
+  const displayName = `${userData.firstName} ${userData.lastName}`;
+
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Header */}
       <div>
         <Link
           href={`/users/${params.id}`}
@@ -53,11 +66,10 @@ export default async function EditUserPage({
         </Link>
         <h1 className="text-3xl font-bold">Edit User</h1>
         <p className="text-muted-foreground">
-          Update user information for {userData.name}
+          Update user information for {displayName}
         </p>
       </div>
 
-      {/* Form */}
       <UserForm
         mode="edit"
         user={userData}
@@ -66,3 +78,4 @@ export default async function EditUserPage({
     </div>
   );
 }
+*/

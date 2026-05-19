@@ -7,18 +7,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createUser, updateUser } from "@/lib/actions";
 
+// go-auth role options
 const ROLE_OPTIONS = [
-  { value: "viewer", label: "Viewer", description: "Can view content only" },
-  { value: "editor", label: "Editor", description: "Can view and edit content" },
+  { value: "guest", label: "Guest", description: "Limited access" },
+  { value: "member", label: "Member", description: "Standard user access" },
   { value: "admin", label: "Admin", description: "Full access including user management" },
+];
+
+// go-auth status options
+const STATUS_OPTIONS = [
+  { value: "active", label: "Active" },
+  { value: "pending", label: "Pending" },
+  { value: "suspended", label: "Suspended" },
+  { value: "disabled", label: "Disabled" },
 ];
 
 type UserData = {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string | null;
-  role: string;
-  username: string | null;
+  username: string;
+  userRole: string;
+  status: string;
 };
 
 interface UserFormProps {
@@ -32,12 +43,14 @@ export function UserForm({ mode, user, cancelHref }: UserFormProps) {
   const [error, setError] = useState<string | null>(null);
   const submittingRef = useRef(false);
 
-  // Form state
-  const [name, setName] = useState(user?.name || "");
+  // Form state (go-auth schema)
+  const [firstName, setFirstName] = useState(user?.firstName || "");
+  const [lastName, setLastName] = useState(user?.lastName || "");
   const [email, setEmail] = useState(user?.email || "");
   const [username, setUsername] = useState(user?.username || "");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState(user?.role || "editor");
+  const [role, setRole] = useState(user?.userRole || "member");
+  const [status, setStatus] = useState(user?.status || "active");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,9 +60,11 @@ export function UserForm({ mode, user, cancelHref }: UserFormProps) {
     setError(null);
 
     const formData = new FormData();
-    formData.set("name", name);
+    formData.set("firstName", firstName);
+    formData.set("lastName", lastName);
     formData.set("email", email);
     formData.set("role", role);
+    formData.set("status", status);
 
     if (mode === "create") {
       formData.set("username", username);
@@ -89,16 +104,29 @@ export function UserForm({ mode, user, cancelHref }: UserFormProps) {
       <div className="rounded-lg border p-6">
         <h2 className="text-xl font-semibold mb-4">User Information</h2>
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="name">Name *</Label>
-            <Input
-              id="name"
-              name="name"
-              required
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="firstName">First Name *</Label>
+              <Input
+                id="firstName"
+                name="firstName"
+                required
+                placeholder="First name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="lastName">Last Name *</Label>
+              <Input
+                id="lastName"
+                name="lastName"
+                required
+                placeholder="Last name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+              />
+            </div>
           </div>
 
           <div>
@@ -113,22 +141,41 @@ export function UserForm({ mode, user, cancelHref }: UserFormProps) {
             />
           </div>
 
-          <div>
-            <Label htmlFor="role">Role *</Label>
-            <select
-              id="role"
-              name="role"
-              required
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              {ROLE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label} - {opt.description}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="role">Role *</Label>
+              <select
+                id="role"
+                name="role"
+                required
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {ROLE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label} - {opt.description}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status *</Label>
+              <select
+                id="status"
+                name="status"
+                required
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       </div>

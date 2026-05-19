@@ -2,8 +2,8 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "./db/client";
-import { users, credentials as credentialsTable } from "./db/schema";
-import { eq } from "drizzle-orm";
+import { users, getUserDisplayName } from "./db/schema";
+import { eq, and } from "drizzle-orm";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -23,33 +23,33 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Find user credentials by username
-          const [userCred] = await db
-            .select({
-              credId: credentialsTable.id,
-              userId: credentialsTable.userId,
-              username: credentialsTable.username,
-              password: credentialsTable.password,
-              userName: users.name,
-              userEmail: users.email,
-              userRole: users.role,
-            })
-            .from(credentialsTable)
-            .innerJoin(users, eq(credentialsTable.userId, users.id))
-            .where(eq(credentialsTable.username, credentials.username))
+          // Find user by username (go-auth schema)
+          const [user] = await db
+            .select()
+            .from(users)
+            .where(
+              and(
+                eq(users.username, credentials.username),
+                eq(users.status, "active") // Only allow active users
+              )
+            )
             .limit(1);
 
-          if (!userCred) {
-            console.log("User not found:", credentials.username);
+          if (!user) {
+            console.log("User not found or not active:", credentials.username);
             return null;
           }
 
-          console.log("User found:", userCred.username);
-          console.log("Stored hash:", userCred.password);
+          if (!user.passwordHash) {
+            console.log("User has no password set:", credentials.username);
+            return null;
+          }
+
+          console.log("User found:", user.username);
 
           const isPasswordValid = await bcrypt.compare(
             credentials.password,
-            userCred.password
+            user.passwordHash
           );
 
           console.log("Password valid:", isPasswordValid);
@@ -59,10 +59,10 @@ export const authOptions: NextAuthOptions = {
           }
 
           return {
-            id: userCred.userId,
-            name: userCred.userName,
-            email: userCred.userEmail || userCred.username,
-            role: userCred.userRole,
+            id: user.id,
+            name: getUserDisplayName(user),
+            email: user.email || user.username,
+            role: user.userRole,
           };
         } catch (error) {
           console.error("Auth error:", error);
