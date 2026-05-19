@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db/client";
-import { archiveAssets, events, sessions, topics, categories, eventTopics, eventCategories, sessionTopics, sessionCategories, locations, addresses, locationAddresses, organizations, organizationLocations, venues, transcripts, transcriptRevisions, users, credentials } from "@/lib/db/schema";
+import { archiveAssets, events, sessions, topics, categories, eventTopics, eventCategories, sessionTopics, sessionCategories, locations, addresses, locationAddresses, organizations, organizationLocations, venues, transcripts, transcriptRevisions, users, getUserDisplayName } from "@/lib/db/schema";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import bcrypt from "bcryptjs";
@@ -1887,9 +1887,12 @@ export async function bulkDeleteTranscripts(transcriptIds: string[]) {
 }
 
 // ============================================================================
-// USER MANAGEMENT ACTIONS (Admin only)
+// USER MANAGEMENT ACTIONS - DISABLED
+// User management is now handled by the CMS.
+// These actions are kept commented out for reference.
 // ============================================================================
 
+/*
 async function requireAdmin(): Promise<{ error?: string }> {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
@@ -1905,14 +1908,15 @@ export async function createUser(formData: FormData): Promise<{ error?: string; 
   const adminCheck = await requireAdmin();
   if (adminCheck.error) return adminCheck;
 
-  const name = formData.get("name") as string;
+  const firstName = formData.get("firstName") as string;
+  const lastName = formData.get("lastName") as string;
   const email = (formData.get("email") as string) || null;
   const username = formData.get("username") as string;
   const password = formData.get("password") as string;
-  const role = (formData.get("role") as string) || "editor";
+  const userRole = (formData.get("role") as string) || "member";
 
-  if (!name || !username || !password) {
-    return { error: "Name, username, and password are required" };
+  if (!firstName || !lastName || !username || !password) {
+    return { error: "First name, last name, username, and password are required" };
   }
 
   if (password.length < 6) {
@@ -1920,30 +1924,26 @@ export async function createUser(formData: FormData): Promise<{ error?: string; 
   }
 
   try {
-    // Check if username already exists
-    const [existingCred] = await db
-      .select({ id: credentials.id })
-      .from(credentials)
-      .where(eq(credentials.username, username))
+    const [existingUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.username, username))
       .limit(1);
 
-    if (existingCred) {
+    if (existingUser) {
       return { error: "Username already exists" };
     }
 
-    // Create user
-    const [newUser] = await db.insert(users).values({
-      name,
-      email,
-      role,
-    }).returning();
-
-    // Create credentials
     const hashedPassword = await bcrypt.hash(password, 10);
-    await db.insert(credentials).values({
-      userId: newUser.id,
+    await db.insert(users).values({
+      firstName,
+      lastName,
       username,
-      password: hashedPassword,
+      email,
+      userRole,
+      status: "active",
+      isEmailVerified: false,
+      passwordHash: hashedPassword,
     });
 
     revalidatePath("/users");
@@ -1963,35 +1963,35 @@ export async function updateUser(id: string, formData: FormData): Promise<{ erro
   const adminCheck = await requireAdmin();
   if (adminCheck.error) return adminCheck;
 
-  const name = formData.get("name") as string;
+  const firstName = formData.get("firstName") as string;
+  const lastName = formData.get("lastName") as string;
   const email = (formData.get("email") as string) || null;
-  const role = (formData.get("role") as string) || "editor";
+  const userRole = (formData.get("role") as string) || "member";
+  const status = (formData.get("status") as string) || "active";
   const newPassword = formData.get("newPassword") as string;
 
-  if (!name) {
-    return { error: "Name is required" };
+  if (!firstName || !lastName) {
+    return { error: "First name and last name are required" };
   }
 
   try {
-    // Update user
-    await db.update(users).set({
-      name,
+    const updateData: Record<string, any> = {
+      firstName,
+      lastName,
       email,
-      role,
+      userRole,
+      status,
       updatedAt: new Date(),
-    }).where(eq(users.id, id));
+    };
 
-    // Update password if provided
     if (newPassword && newPassword.length > 0) {
       if (newPassword.length < 6) {
         return { error: "Password must be at least 6 characters" };
       }
-      const hashedPassword = await bcrypt.hash(newPassword, 10);
-      await db.update(credentials).set({
-        password: hashedPassword,
-        updatedAt: new Date(),
-      }).where(eq(credentials.userId, id));
+      updateData.passwordHash = await bcrypt.hash(newPassword, 10);
     }
+
+    await db.update(users).set(updateData).where(eq(users.id, id));
 
     revalidatePath("/users");
     revalidatePath(`/users/${id}`);
@@ -2011,16 +2011,12 @@ export async function deleteUser(id: string): Promise<{ error?: string; success?
   const adminCheck = await requireAdmin();
   if (adminCheck.error) return adminCheck;
 
-  // Prevent self-deletion
   const session = await getServerSession(authOptions);
   if (session?.user && (session.user as any).id === id) {
     return { error: "You cannot delete your own account" };
   }
 
   try {
-    // Delete credentials first (foreign key)
-    await db.delete(credentials).where(eq(credentials.userId, id));
-    // Delete user
     await db.delete(users).where(eq(users.id, id));
 
     revalidatePath("/users");
@@ -2035,3 +2031,4 @@ export async function deleteUser(id: string): Promise<{ error?: string; success?
 
   return { success: true };
 }
+*/

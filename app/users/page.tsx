@@ -1,6 +1,5 @@
 import { db } from "@/lib/db/client";
-import { users, credentials } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { users } from "@/lib/db/schema";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -19,19 +18,20 @@ export default async function UsersPage() {
     redirect("/");
   }
 
-  // Fetch all users with their credentials
+  // Fetch all users (go-auth schema)
   const userList = await db
     .select({
       id: users.id,
-      name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
-      role: users.role,
+      username: users.username,
+      userRole: users.userRole,
+      status: users.status,
       createdAt: users.createdAt,
-      username: credentials.username,
     })
     .from(users)
-    .leftJoin(credentials, eq(users.id, credentials.userId))
-    .orderBy(users.name);
+    .orderBy(users.lastName);
 
   return (
     <div className="space-y-6">
@@ -40,12 +40,14 @@ export default async function UsersPage() {
         <div>
           <h1 className="text-3xl font-bold">Users</h1>
           <p className="text-muted-foreground">
-            Manage user accounts and permissions
+            User accounts (managed via CMS)
           </p>
         </div>
+        {/* User management disabled - handled by CMS
         <Button asChild>
           <Link href="/users/new">Add User</Link>
         </Button>
+        */}
       </div>
 
       {/* Users Table */}
@@ -57,6 +59,7 @@ export default async function UsersPage() {
               <th className="px-4 py-3 text-left text-sm font-medium">Username</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Email</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Role</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Created</th>
               <th className="px-4 py-3 text-right text-sm font-medium">Actions</th>
             </tr>
@@ -69,11 +72,11 @@ export default async function UsersPage() {
                     href={`/users/${user.id}`}
                     className="font-medium hover:underline"
                   >
-                    {user.name}
+                    {user.firstName} {user.lastName}
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
-                  {user.username || "-"}
+                  {user.username}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
                   {user.email || "-"}
@@ -81,19 +84,33 @@ export default async function UsersPage() {
                 <td className="px-4 py-3">
                   <span
                     className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      user.role === "admin"
+                      user.userRole === "admin"
                         ? "bg-red-100 text-red-700"
-                        : user.role === "editor"
+                        : user.userRole === "member"
                         ? "bg-blue-100 text-blue-700"
                         : "bg-gray-100 text-gray-700"
                     }`}
                   >
-                    {user.role}
+                    {user.userRole}
+                  </span>
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                      user.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : user.status === "suspended"
+                        ? "bg-yellow-100 text-yellow-700"
+                        : "bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    {user.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-muted-foreground">
                   {new Date(user.createdAt).toLocaleDateString()}
                 </td>
+                {/* Edit disabled - managed via CMS
                 <td className="px-4 py-3 text-right">
                   <Link
                     href={`/users/${user.id}/edit`}
@@ -102,11 +119,15 @@ export default async function UsersPage() {
                     Edit
                   </Link>
                 </td>
+                */}
+                <td className="px-4 py-3 text-right text-muted-foreground text-sm">
+                  View only
+                </td>
               </tr>
             ))}
             {userList.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                   No users found
                 </td>
               </tr>

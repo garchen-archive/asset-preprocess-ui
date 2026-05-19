@@ -1,13 +1,19 @@
-import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { UserForm } from "@/components/user-form";
 
 export const dynamic = "force-dynamic";
 
+// User creation disabled - managed via CMS
 export default async function NewUserPage() {
-  // Check admin access
+  redirect("/users");
+}
+
+/* Original new user page - disabled, user management moved to CMS
+import Link from "next/link";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { UserForm } from "@/components/user-form";
+
+export default async function NewUserPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     redirect("/login");
@@ -18,7 +24,6 @@ export default async function NewUserPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Header */}
       <div>
         <Link
           href="/users"
@@ -32,8 +37,8 @@ export default async function NewUserPage() {
         </p>
       </div>
 
-      {/* Form */}
       <UserForm mode="create" cancelHref="/users" />
     </div>
   );
 }
+*/

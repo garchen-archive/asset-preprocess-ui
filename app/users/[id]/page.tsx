@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { users, credentials } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { getServerSession } from "next-auth";
@@ -24,19 +24,20 @@ export default async function UserDetailPage({
     redirect("/");
   }
 
-  // Fetch user with credentials
+  // Fetch user (go-auth schema)
   const [userData] = await db
     .select({
       id: users.id,
-      name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       email: users.email,
-      role: users.role,
+      username: users.username,
+      userRole: users.userRole,
+      status: users.status,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
-      username: credentials.username,
     })
     .from(users)
-    .leftJoin(credentials, eq(users.id, credentials.userId))
     .where(eq(users.id, params.id))
     .limit(1);
 
@@ -44,6 +45,7 @@ export default async function UserDetailPage({
     notFound();
   }
 
+  const displayName = `${userData.firstName} ${userData.lastName}`;
   const isCurrentUser = (session.user as any).id === userData.id;
 
   return (
@@ -58,17 +60,19 @@ export default async function UserDetailPage({
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">{userData.name}</h1>
+            <h1 className="text-3xl font-bold">{displayName}</h1>
             <p className="text-muted-foreground">@{userData.username}</p>
           </div>
+          {/* Edit/Delete disabled - managed via CMS
           <div className="flex gap-2">
             <Button variant="outline" asChild>
               <Link href={`/users/${params.id}/edit`}>Edit</Link>
             </Button>
             {!isCurrentUser && (
-              <DeleteUserButton userId={params.id} userName={userData.name} />
+              <DeleteUserButton userId={params.id} userName={displayName} />
             )}
           </div>
+          */}
         </div>
       </div>
 
@@ -78,12 +82,16 @@ export default async function UserDetailPage({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-muted-foreground">Name</p>
-            <p className="font-medium">{userData.name}</p>
+            <p className="text-sm text-muted-foreground">First Name</p>
+            <p className="font-medium">{userData.firstName}</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Last Name</p>
+            <p className="font-medium">{userData.lastName}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Username</p>
-            <p className="font-medium">{userData.username || "-"}</p>
+            <p className="font-medium">{userData.username}</p>
           </div>
           <div>
             <p className="text-sm text-muted-foreground">Email</p>
@@ -93,14 +101,28 @@ export default async function UserDetailPage({
             <p className="text-sm text-muted-foreground">Role</p>
             <span
               className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                userData.role === "admin"
+                userData.userRole === "admin"
                   ? "bg-red-100 text-red-700"
-                  : userData.role === "editor"
+                  : userData.userRole === "member"
                   ? "bg-blue-100 text-blue-700"
                   : "bg-gray-100 text-gray-700"
               }`}
             >
-              {userData.role}
+              {userData.userRole}
+            </span>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Status</p>
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                userData.status === "active"
+                  ? "bg-green-100 text-green-700"
+                  : userData.status === "suspended"
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {userData.status}
             </span>
           </div>
           <div>
