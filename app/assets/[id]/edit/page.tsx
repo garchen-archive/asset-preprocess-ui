@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { archiveAssets, sessions, events } from "@/lib/db/schema";
+import { archiveAssets, sessions, events, eventSessionAsset } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -42,6 +42,21 @@ export default async function AssetEditPage({
 
   // Fetch all events for the event dropdown
   const eventsList = await db.select().from(events).orderBy(asc(events.eventName));
+
+  // Fetch the EventSessionAsset link for this asset (the canonical way to link assets to sessions)
+  // This takes precedence over the deprecated eventSessionId column
+  const sessionLinks = await db
+    .select({
+      eventSessionId: eventSessionAsset.eventSessionId,
+    })
+    .from(eventSessionAsset)
+    .where(eq(eventSessionAsset.assetId, params.id))
+    .limit(1);
+
+  // Use EventSessionAsset link if exists, otherwise fall back to deprecated eventSessionId column
+  const effectiveSessionId = sessionLinks.length > 0
+    ? sessionLinks[0].eventSessionId
+    : data.eventSessionId;
 
   return (
     <div className="space-y-6">
@@ -508,7 +523,7 @@ export default async function AssetEditPage({
                 events={eventsList}
                 sessions={sessionsList}
                 defaultEventId={data.eventId}
-                defaultSessionId={data.eventSessionId}
+                defaultSessionId={effectiveSessionId}
               />
             </div>
 

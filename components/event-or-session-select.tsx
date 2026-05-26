@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 
 interface Session {
   id: string;
@@ -32,22 +33,34 @@ export function EventOrSessionSelect({
   defaultEventId,
   defaultSessionId,
 }: EventOrSessionSelectProps) {
-  // Determine initial mode: 'event' or 'session' based on which has a value
+  // Track original values to detect changes
+  const originalEventId = defaultEventId || "";
+  const originalSessionId = defaultSessionId || "";
+  const hadOriginalAssignment = !!(originalEventId || originalSessionId);
+
+  // Determine initial mode based on original assignment
   const initialMode = defaultSessionId ? "session" : "event";
   const [mode, setMode] = useState<"event" | "session">(initialMode);
   const [eventSearch, setEventSearch] = useState("");
   const [sessionSearch, setSessionSearch] = useState("");
-  const [selectedEventId, setSelectedEventId] = useState<string>(
-    defaultEventId || ""
-  );
-  const [selectedSessionId, setSelectedSessionId] = useState<string>(
-    defaultSessionId || ""
-  );
+  const [selectedEventId, setSelectedEventId] = useState<string>(originalEventId);
+  const [selectedSessionId, setSelectedSessionId] = useState<string>(originalSessionId);
   const [isEventDropdownOpen, setIsEventDropdownOpen] = useState(false);
   const [isSessionDropdownOpen, setIsSessionDropdownOpen] = useState(false);
 
-  // Check if asset is uncataloged (neither event nor session selected)
-  const isUncataloged = !selectedEventId && !selectedSessionId;
+  // Track if user has made an explicit selection in the current mode
+  const [hasExplicitSelection, setHasExplicitSelection] = useState(false);
+
+  // Determine what will be submitted based on mode
+  const effectiveEventId = mode === "event" ? selectedEventId : "";
+  const effectiveSessionId = mode === "session" ? selectedSessionId : "";
+
+  // Check various states
+  const isUncataloged = !effectiveEventId && !effectiveSessionId;
+  const willUnassign = hadOriginalAssignment && isUncataloged;
+  const isChangingAssignment = (effectiveEventId !== originalEventId) || (effectiveSessionId !== originalSessionId);
+  const isChangingFromEventToSession = originalEventId && !originalSessionId && mode === "session" && selectedSessionId;
+  const isChangingFromSessionToEvent = originalSessionId && !originalEventId && mode === "event" && selectedEventId;
 
   const filteredEvents = useMemo(() => {
     if (!eventSearch) return events;
@@ -69,6 +82,8 @@ export function EventOrSessionSelect({
 
   const selectedEvent = events.find((e) => e.id === selectedEventId);
   const selectedSession = sessions.find((s) => s.session.id === selectedSessionId);
+  const originalEvent = events.find((e) => e.id === originalEventId);
+  const originalSession = sessions.find((s) => s.session.id === originalSessionId);
 
   const getSessionHierarchyLabel = (item: SessionWithHierarchy) => {
     const parts = [];
@@ -77,8 +92,37 @@ export function EventOrSessionSelect({
     return parts.join(" > ");
   };
 
+  // Handle mode change - don't auto-clear, just switch view
+  const handleModeChange = (newMode: "event" | "session") => {
+    setMode(newMode);
+    setHasExplicitSelection(false);
+  };
+
+  // Explicit unassign action
+  const handleUnassign = () => {
+    setSelectedEventId("");
+    setSelectedSessionId("");
+    setHasExplicitSelection(true);
+  };
+
   return (
     <div className="space-y-4">
+      {/* Current Assignment Display */}
+      {hadOriginalAssignment && (
+        <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+          <div className="text-sm text-blue-800">
+            <strong className="font-medium">Current Assignment:</strong>{" "}
+            {originalSessionId && originalSession ? (
+              <span>Session: {getSessionHierarchyLabel(originalSession)}</span>
+            ) : originalEventId && originalEvent ? (
+              <span>Event: {originalEvent.eventName}</span>
+            ) : (
+              <span>Unknown</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div>
         <Label className="text-base font-semibold">Assignment Level</Label>
         <p className="text-sm text-muted-foreground mb-3">
@@ -94,8 +138,7 @@ export function EventOrSessionSelect({
               checked={mode === "event"}
               onChange={(e) => {
                 if (e.target.checked) {
-                  setMode("event");
-                  setSelectedSessionId("");
+                  handleModeChange("event");
                 }
               }}
               className="h-4 w-4"
@@ -113,8 +156,7 @@ export function EventOrSessionSelect({
               checked={mode === "session"}
               onChange={(e) => {
                 if (e.target.checked) {
-                  setMode("session");
-                  setSelectedEventId("");
+                  handleModeChange("session");
                 }
               }}
               className="h-4 w-4"
@@ -153,23 +195,13 @@ export function EventOrSessionSelect({
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
 
-            {/* Hidden input for form submission */}
-            <input type="hidden" name="eventId" value={selectedEventId} />
-            <input type="hidden" name="eventSessionId" value="" />
+            {/* Hidden inputs for form submission - only submit based on current mode */}
+            <input type="hidden" name="eventId" value={effectiveEventId} />
+            <input type="hidden" name="eventSessionId" value={effectiveSessionId} />
 
             {/* Dropdown */}
             {isEventDropdownOpen && (
               <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
-                <div
-                  className="px-2 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm"
-                  onClick={() => {
-                    setSelectedEventId("");
-                    setEventSearch("");
-                    setIsEventDropdownOpen(false);
-                  }}
-                >
-                  <span className="text-muted-foreground">None</span>
-                </div>
                 {filteredEvents.length === 0 ? (
                   <div className="px-2 py-1.5 text-sm text-muted-foreground">
                     No events found
@@ -183,8 +215,10 @@ export function EventOrSessionSelect({
                       }`}
                       onClick={() => {
                         setSelectedEventId(event.id);
+                        setSelectedSessionId(""); // Clear session when selecting event
                         setEventSearch("");
                         setIsEventDropdownOpen(false);
+                        setHasExplicitSelection(true);
                       }}
                     >
                       <div className="font-medium">{event.eventName}</div>
@@ -230,23 +264,13 @@ export function EventOrSessionSelect({
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
 
-            {/* Hidden inputs for form submission */}
-            <input type="hidden" name="eventId" value="" />
-            <input type="hidden" name="eventSessionId" value={selectedSessionId} />
+            {/* Hidden inputs for form submission - only submit based on current mode */}
+            <input type="hidden" name="eventId" value={effectiveEventId} />
+            <input type="hidden" name="eventSessionId" value={effectiveSessionId} />
 
             {/* Dropdown */}
             {isSessionDropdownOpen && (
               <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 shadow-md">
-                <div
-                  className="px-2 py-1.5 text-sm cursor-pointer hover:bg-accent rounded-sm"
-                  onClick={() => {
-                    setSelectedSessionId("");
-                    setSessionSearch("");
-                    setIsSessionDropdownOpen(false);
-                  }}
-                >
-                  <span className="text-muted-foreground">None</span>
-                </div>
                 {filteredSessions.length === 0 ? (
                   <div className="px-2 py-1.5 text-sm text-muted-foreground">
                     No sessions found
@@ -260,8 +284,10 @@ export function EventOrSessionSelect({
                       }`}
                       onClick={() => {
                         setSelectedSessionId(item.session.id);
+                        setSelectedEventId(""); // Clear event when selecting session
                         setSessionSearch("");
                         setIsSessionDropdownOpen(false);
+                        setHasExplicitSelection(true);
                       }}
                     >
                       <div className="font-medium">{item.session.sessionName}</div>
@@ -285,8 +311,66 @@ export function EventOrSessionSelect({
         </div>
       )}
 
-      {/* Warning when asset is uncataloged */}
-      {isUncataloged && (
+      {/* Explicit Unassign Button */}
+      {hadOriginalAssignment && !isUncataloged && (
+        <div className="pt-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleUnassign}
+            className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+          >
+            Unassign from {originalSessionId ? "Session" : "Event"}
+          </Button>
+        </div>
+      )}
+
+      {/* Warning when assignment will change */}
+      {isChangingAssignment && !willUnassign && (effectiveEventId || effectiveSessionId) && (
+        <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            <div className="text-sm text-blue-800">
+              <strong className="font-medium">Assignment will change:</strong>{" "}
+              {isChangingFromEventToSession && selectedSession ? (
+                <span>Event → Session: {getSessionHierarchyLabel(selectedSession)}</span>
+              ) : isChangingFromSessionToEvent && selectedEvent ? (
+                <span>Session → Event: {selectedEvent.eventName}</span>
+              ) : effectiveSessionId && selectedSession ? (
+                <span>New session: {getSessionHierarchyLabel(selectedSession)}</span>
+              ) : effectiveEventId && selectedEvent ? (
+                <span>New event: {selectedEvent.eventName}</span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning when asset will be unassigned */}
+      {willUnassign && (
+        <div className="rounded-md bg-red-50 border border-red-200 p-3">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
+            <div className="text-sm text-red-800">
+              <strong className="font-medium">Warning:</strong> This asset will be unassigned and become uncataloged.
+              {mode === "event" && !selectedEventId && (
+                <span> Please select an event or click "Unassign" explicitly.</span>
+              )}
+              {mode === "session" && !selectedSessionId && (
+                <span> Please select a session or click "Unassign" explicitly.</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning when asset is uncataloged (no original assignment) */}
+      {isUncataloged && !hadOriginalAssignment && (
         <div className="rounded-md bg-yellow-50 border border-yellow-200 p-3">
           <div className="flex items-start gap-2">
             <svg className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">

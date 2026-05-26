@@ -45,10 +45,14 @@ export async function updateAsset(id: string, formData: FormData) {
   const eventSessionId = formData.get("eventSessionId") as string;
 
   if (hasEventIdField || hasEventSessionIdField) {
-    // Send explicit null to clear assignment, or the value to set it
+    // Asset assignment modes:
+    // 1. Direct Event assignment: set event_id, clear event_session_id (deprecated)
+    // 2. Session assignment: clear event_id, clear event_session_id (use EventSessionAsset instead)
+    // 3. Unassign: clear both
+    // Note: event_session_id column is deprecated - session links use EventSessionAsset table
     metadata.curation.event = {
       event_id: eventId || null,
-      event_session_id: eventSessionId || null,
+      event_session_id: null,  // Always null - deprecated column, use EventSessionAsset for session links
     };
   }
 
@@ -155,9 +159,12 @@ export async function updateAsset(id: string, formData: FormData) {
     throw new Error(error.message || "Failed to update asset");
   }
 
-  // If assigning to a session, also create EventSessionAsset for Collections API
-  // This links the asset to the session for playback presentation
+  // Handle EventSessionAsset links based on assignment change
+  // When assigning to a session: create EventSessionAsset link
+  // When assigning to event OR unassigning: delete existing EventSessionAsset links
+
   if (eventSessionId) {
+    // Assigning to Session: Create EventSessionAsset link (if not exists)
     try {
       // First check if a link already exists
       const checkResponse = await fetch(
@@ -199,6 +206,42 @@ export async function updateAsset(id: string, formData: FormData) {
     } catch (linkError) {
       // Log but don't fail - the asset update succeeded
       console.warn("Error creating EventSessionAsset link:", linkError);
+    }
+  } else if (hasEventIdField || hasEventSessionIdField) {
+    // Assigning to Event OR Unassigning: Delete existing EventSessionAsset links
+    // This ensures mutual exclusivity - asset is either linked via EventSessionAsset OR has direct eventId
+    try {
+      // Get all EventSessionAsset links for this asset
+      const assetLinksResponse = await fetch(
+        `${PIPELINE_API_URL}/api/v1/admin/assets/${id}/sessions`,
+        {
+          headers: { "X-API-Key": PIPELINE_API_KEY },
+        }
+      );
+
+      if (assetLinksResponse.ok) {
+        const assetLinks = await assetLinksResponse.json();
+        const sessionIds = assetLinks.sessions?.map((s: any) => s.event_session_id) || [];
+
+        // Delete each link
+        await Promise.allSettled(
+          sessionIds.map(async (sessionId: string) => {
+            const deleteResponse = await fetch(
+              `${PIPELINE_API_URL}/api/v1/admin/sessions/${sessionId}/assets/${id}`,
+              {
+                method: "DELETE",
+                headers: { "X-API-Key": PIPELINE_API_KEY },
+              }
+            );
+            if (!deleteResponse.ok) {
+              console.warn(`Failed to delete EventSessionAsset link for session ${sessionId}`);
+            }
+          })
+        );
+      }
+    } catch (unlinkError) {
+      // Log but don't fail - the asset update succeeded
+      console.warn("Error removing EventSessionAsset links:", unlinkError);
     }
   }
 
@@ -1258,16 +1301,18 @@ export async function bulkAssignAssets({
     }
 
     // Build the update request for pipeline API
-    // For unassign, send explicit nulls to clear the assignment
+    // Asset assignment modes:
+    // 1. Direct Event assignment: set event_id, clear event_session_id (deprecated)
+    // 2. Session assignment: clear event_id, clear event_session_id (use EventSessionAsset instead)
+    // 3. Unassign: clear both
+    // Note: event_session_id column is deprecated - session links use EventSessionAsset table
     const updateRequest = {
       metadata: {
         curation: {
-          event: unassign
-            ? { event_id: null, event_session_id: null }
-            : {
-                event_id: eventId || null,
-                event_session_id: eventSessionId || null,
-              },
+          event: {
+            event_id: eventId || null,
+            event_session_id: null,  // Always null - deprecated column, use EventSessionAsset for session links
+          },
         },
       },
     };
@@ -1301,8 +1346,9 @@ export async function bulkAssignAssets({
       };
     }
 
-    // If assigning to a session, also create EventSessionAsset links for Collections API
+    // Handle EventSessionAsset links based on assignment change
     if (eventSessionId && !unassign) {
+      // Assigning to Session: Create EventSessionAsset links
       // First get existing links
       let existingAssetIds: string[] = [];
       try {
@@ -1339,6 +1385,45 @@ export async function bulkAssignAssets({
           );
           if (!linkResponse.ok) {
             console.warn(`Failed to create EventSessionAsset for ${assetId}`);
+          }
+        })
+      );
+    } else if (eventId || unassign) {
+      // Assigning to Event OR Unassigning: Delete existing EventSessionAsset links
+      // This ensures mutual exclusivity - asset is either linked via EventSessionAsset OR has direct eventId
+      await Promise.allSettled(
+        assetIds.map(async (assetId) => {
+          try {
+            // Get all EventSessionAsset links for this asset
+            const assetLinksResponse = await fetch(
+              `${PIPELINE_API_URL}/api/v1/admin/assets/${assetId}/sessions`,
+              {
+                headers: { "X-API-Key": PIPELINE_API_KEY },
+              }
+            );
+
+            if (assetLinksResponse.ok) {
+              const assetLinks = await assetLinksResponse.json();
+              const sessionIds = assetLinks.sessions?.map((s: any) => s.event_session_id) || [];
+
+              // Delete each link
+              await Promise.allSettled(
+                sessionIds.map(async (sessionId: string) => {
+                  const deleteResponse = await fetch(
+                    `${PIPELINE_API_URL}/api/v1/admin/sessions/${sessionId}/assets/${assetId}`,
+                    {
+                      method: "DELETE",
+                      headers: { "X-API-Key": PIPELINE_API_KEY },
+                    }
+                  );
+                  if (!deleteResponse.ok) {
+                    console.warn(`Failed to delete EventSessionAsset link for asset ${assetId}, session ${sessionId}`);
+                  }
+                })
+              );
+            }
+          } catch (unlinkError) {
+            console.warn(`Error removing EventSessionAsset links for asset ${assetId}:`, unlinkError);
           }
         })
       );
