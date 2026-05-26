@@ -321,6 +321,7 @@ export function TranscriptsPageClient({
               <th className="px-4 py-3 text-left text-sm font-medium">Media Asset</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Language</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Kind</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Speaker</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Timecode</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Source</th>
@@ -331,7 +332,7 @@ export function TranscriptsPageClient({
           <tbody className="divide-y">
             {transcripts.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                   No transcripts found
                 </td>
               </tr>
@@ -363,6 +364,9 @@ export function TranscriptsPageClient({
                     {LANGUAGE_LABELS[transcript.language] || transcript.language}
                   </td>
                   <td className="px-4 py-3 text-sm capitalize">{transcript.kind}</td>
+                  <td className="px-4 py-3 text-sm capitalize">
+                    {transcript.spokenSource || "primary"}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${

@@ -140,7 +140,7 @@ export async function updateAsset(id: string, formData: FormData) {
     updateRequest.metadata = metadata;
   }
 
-  // Call pipeline API
+  // Call pipeline API to update asset
   const response = await fetch(`${PIPELINE_API_URL}/api/v1/assets/${id}`, {
     method: "PATCH",
     headers: {
@@ -153,6 +153,53 @@ export async function updateAsset(id: string, formData: FormData) {
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: "Failed to update asset" }));
     throw new Error(error.message || "Failed to update asset");
+  }
+
+  // If assigning to a session, also create EventSessionAsset for Collections API
+  // This links the asset to the session for playback presentation
+  if (eventSessionId) {
+    try {
+      // First check if a link already exists
+      const checkResponse = await fetch(
+        `${PIPELINE_API_URL}/api/v1/admin/sessions/${eventSessionId}/assets`,
+        {
+          headers: { "X-API-Key": PIPELINE_API_KEY },
+        }
+      );
+
+      let linkExists = false;
+      if (checkResponse.ok) {
+        const existingLinks = await checkResponse.json();
+        linkExists = existingLinks.assets?.some((a: any) => a.asset_id === id);
+      }
+
+      // Create the link if it doesn't exist
+      if (!linkExists) {
+        const linkResponse = await fetch(
+          `${PIPELINE_API_URL}/api/v1/admin/sessions/${eventSessionId}/assets`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-API-Key": PIPELINE_API_KEY,
+            },
+            body: JSON.stringify({
+              asset_id: id,
+              variant_type: "primary",
+              variant_label: "Main Recording",
+            }),
+          }
+        );
+
+        if (!linkResponse.ok) {
+          // Log but don't fail - the asset update succeeded
+          console.warn("Failed to create EventSessionAsset link:", await linkResponse.text());
+        }
+      }
+    } catch (linkError) {
+      // Log but don't fail - the asset update succeeded
+      console.warn("Error creating EventSessionAsset link:", linkError);
+    }
   }
 
   revalidatePath(`/assets/${id}`);
@@ -1254,6 +1301,49 @@ export async function bulkAssignAssets({
       };
     }
 
+    // If assigning to a session, also create EventSessionAsset links for Collections API
+    if (eventSessionId && !unassign) {
+      // First get existing links
+      let existingAssetIds: string[] = [];
+      try {
+        const checkResponse = await fetch(
+          `${PIPELINE_API_URL}/api/v1/admin/sessions/${eventSessionId}/assets`,
+          { headers: { "X-API-Key": PIPELINE_API_KEY } }
+        );
+        if (checkResponse.ok) {
+          const existingLinks = await checkResponse.json();
+          existingAssetIds = existingLinks.assets?.map((a: any) => a.asset_id) || [];
+        }
+      } catch {
+        // Continue even if check fails
+      }
+
+      // Create links for assets that don't have one
+      const assetsNeedingLink = assetIds.filter((id) => !existingAssetIds.includes(id));
+      await Promise.allSettled(
+        assetsNeedingLink.map(async (assetId) => {
+          const linkResponse = await fetch(
+            `${PIPELINE_API_URL}/api/v1/admin/sessions/${eventSessionId}/assets`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-API-Key": PIPELINE_API_KEY,
+              },
+              body: JSON.stringify({
+                asset_id: assetId,
+                variant_type: "primary",
+                variant_label: "Main Recording",
+              }),
+            }
+          );
+          if (!linkResponse.ok) {
+            console.warn(`Failed to create EventSessionAsset for ${assetId}`);
+          }
+        })
+      );
+    }
+
     revalidatePath("/assets");
     return { success: true };
   } catch (error: any) {
@@ -1721,7 +1811,7 @@ export async function createTranscript(formData: FormData): Promise<{ error: str
     eventSessionAssetId: (formData.get("eventSessionAssetId") as string) || null,
     language: formData.get("language") as string,
     kind: (formData.get("kind") as string) || "transcript",
-    spokenSource: (formData.get("spokenSource") as string) || null,
+    spokenSource: (formData.get("spokenSource") as string) || "primary",
     spokenLanguage: (formData.get("spokenLanguage") as string) || null,
     translationOf: (formData.get("translationOf") as string) || null,
     timecodeStatus: (formData.get("timecodeStatus") as string) || "none",
@@ -1784,7 +1874,7 @@ export async function updateTranscript(id: string, formData: FormData) {
     eventSessionAssetId: (formData.get("eventSessionAssetId") as string) || null,
     language: formData.get("language") as string,
     kind: formData.get("kind") as string,
-    spokenSource: (formData.get("spokenSource") as string) || null,
+    spokenSource: (formData.get("spokenSource") as string) || "primary",
     spokenLanguage: (formData.get("spokenLanguage") as string) || null,
     translationOf: (formData.get("translationOf") as string) || null,
     timecodeStatus: (formData.get("timecodeStatus") as string) || "none",

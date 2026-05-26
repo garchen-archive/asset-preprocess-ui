@@ -29,11 +29,12 @@ const KIND_OPTIONS = [
 ];
 
 const SPOKEN_SOURCE_OPTIONS = [
-  { value: "", label: "Not specified" },
+  { value: "primary", label: "Primary (Default)" },
   { value: "teacher", label: "Teacher" },
   { value: "interpreter", label: "Interpreter" },
-  { value: "mixed", label: "Mixed" },
-  { value: "unknown", label: "Unknown" },
+  { value: "translator", label: "Translator" },
+  { value: "student", label: "Student" },
+  { value: "mixed", label: "Mixed (Q&A, Panel)" },
 ];
 
 const TIMECODE_OPTIONS = [
@@ -82,7 +83,7 @@ type TranscriptData = {
   eventSessionAssetId: string | null;
   language: string;
   kind: string;
-  spokenSource: string | null;
+  spokenSource: string;
   spokenLanguage: string | null;
   translationOf: string | null;
   timecodeStatus: string | null;
@@ -139,7 +140,7 @@ export function TranscriptForm({
   );
   const [language, setLanguage] = useState(transcript?.language || "en");
   const [kind, setKind] = useState(transcript?.kind || "transcript");
-  const [spokenSource, setSpokenSource] = useState(transcript?.spokenSource || "");
+  const [spokenSource, setSpokenSource] = useState(transcript?.spokenSource || "primary");
   const [spokenLanguage, setSpokenLanguage] = useState(transcript?.spokenLanguage || "");
   const [translationOf, setTranslationOf] = useState(transcript?.translationOf || "");
   const [timecodeStatus, setTimecodeStatus] = useState(transcript?.timecodeStatus || "none");
@@ -353,10 +354,11 @@ export function TranscriptForm({
           </div>
 
           <div>
-            <Label htmlFor="spokenSource">Spoken Source</Label>
+            <Label htmlFor="spokenSource">Spoken Source *</Label>
             <select
               id="spokenSource"
               name="spokenSource"
+              required
               value={spokenSource}
               onChange={(e) => setSpokenSource(e.target.value)}
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -367,11 +369,9 @@ export function TranscriptForm({
                 </option>
               ))}
             </select>
-            {mode === "create" && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Who is speaking in the audio being transcribed.
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              Identifies the speaker for subtitle track naming in the video player.
+            </p>
           </div>
 
           <div>

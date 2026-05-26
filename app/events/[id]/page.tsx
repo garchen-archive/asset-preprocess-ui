@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations } from "@/lib/db/schema";
+import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset } from "@/lib/db/schema";
 import { eq, sql, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -65,22 +65,28 @@ export default async function EventDetailPage({
     .from(archiveAssets)
     .where(eq(archiveAssets.eventId, params.id));
 
-  // Get all assets from all sessions in this event
+  // Get all assets from all sessions in this event via event_session_asset
   const sessionIds = eventSessions.map(s => s.id);
-  const sessionAssets = sessionIds.length > 0
+  const sessionAssetLinks = sessionIds.length > 0
     ? await db
         .select({
-          id: archiveAssets.id,
-          title: archiveAssets.title,
-          name: archiveAssets.name,
-          assetType: archiveAssets.assetType,
-          duration: archiveAssets.duration,
-          eventSessionId: archiveAssets.eventSessionId,
-          catalogingStatus: archiveAssets.catalogingStatus,
+          id: asset.id,
+          title: asset.title,
+          name: asset.name,
+          assetType: asset.assetType,
+          duration: asset.duration,
+          eventSessionId: eventSessionAsset.eventSessionId,
+          catalogingStatus: asset.catalogingStatus,
+          variantType: eventSessionAsset.variantType,
+          variantLabel: eventSessionAsset.variantLabel,
         })
-        .from(archiveAssets)
-        .where(inArray(archiveAssets.eventSessionId, sessionIds))
+        .from(eventSessionAsset)
+        .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+        .where(inArray(eventSessionAsset.eventSessionId, sessionIds))
     : [];
+
+  // For backwards compatibility, map to same structure
+  const sessionAssets = sessionAssetLinks;
 
   const totalAssetCount = directEventAssets.length + sessionAssets.length;
 

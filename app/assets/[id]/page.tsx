@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { archiveAssets, sessions, events, transcripts } from "@/lib/db/schema";
+import { archiveAssets, sessions, events, transcripts, eventSessionAsset } from "@/lib/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,21 @@ export default async function AssetDetailPage({
         eq(transcripts.canonicalAssetId, params.id)
       )
     );
+
+  // Fetch session links via event_session_asset (the canonical source for session-asset relationships)
+  const sessionLinks = await db
+    .select({
+      linkId: eventSessionAsset.id,
+      sessionId: eventSessionAsset.eventSessionId,
+      variantType: eventSessionAsset.variantType,
+      variantLabel: eventSessionAsset.variantLabel,
+      session: sessions,
+      event: events,
+    })
+    .from(eventSessionAsset)
+    .innerJoin(sessions, eq(eventSessionAsset.eventSessionId, sessions.id))
+    .leftJoin(events, eq(sessions.eventId, events.id))
+    .where(eq(eventSessionAsset.assetId, params.id));
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -442,6 +457,9 @@ export default async function AssetDetailPage({
                           className="text-sm font-medium text-blue-600 hover:underline"
                         >
                           {tr.language.toUpperCase()} {tr.kind}
+                          {tr.spokenSource && tr.spokenSource !== "primary" && tr.spokenSource !== "mixed" && (
+                            <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
+                          )}
                         </Link>
                         <div className="flex items-center gap-2 mt-1">
                           <span
@@ -503,6 +521,9 @@ export default async function AssetDetailPage({
                           className="text-sm font-medium text-blue-600 hover:underline"
                         >
                           {tr.language.toUpperCase()} {tr.kind}
+                          {tr.spokenSource && tr.spokenSource !== "primary" && tr.spokenSource !== "mixed" && (
+                            <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
+                          )}
                         </Link>
                         <div className="flex items-center gap-2 mt-1">
                           <span
@@ -694,13 +715,17 @@ export default async function AssetDetailPage({
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Assignment Level</dt>
                 <dd className="text-sm mt-1">
-                  {data.eventId && !data.eventSessionId ? (
+                  {data.eventId && sessionLinks.length === 0 ? (
                     <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700">
                       Event (Direct)
                     </span>
-                  ) : data.eventSessionId && !data.eventId ? (
+                  ) : sessionLinks.length > 0 ? (
                     <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-purple-100 text-purple-700">
                       Session (Detailed)
+                    </span>
+                  ) : data.eventSessionId ? (
+                    <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-orange-100 text-orange-700">
+                      Session (Legacy)
                     </span>
                   ) : (
                     <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-700">
@@ -722,14 +747,37 @@ export default async function AssetDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Session</dt>
+                <dt className="text-sm font-medium text-muted-foreground">Session Links</dt>
                 <dd className="text-sm mt-1">
-                  {session ? (
-                    <Link href={`/sessions/${session.id}`} className="text-blue-600 hover:underline">
-                      {session.sessionName}
-                    </Link>
+                  {sessionLinks.length > 0 ? (
+                    <div className="space-y-2">
+                      {sessionLinks.map((link) => (
+                        <div key={link.linkId} className="flex items-center gap-2">
+                          <Link href={`/sessions/${link.session.id}`} className="text-blue-600 hover:underline">
+                            {link.session.sessionName}
+                          </Link>
+                          {link.variantType && (
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700">
+                              {link.variantLabel || link.variantType}
+                            </span>
+                          )}
+                          {link.event && (
+                            <span className="text-xs text-muted-foreground">
+                              ({link.event.eventName})
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : session ? (
+                    <div className="text-yellow-600 text-xs">
+                      Legacy link via asset.event_session_id:{" "}
+                      <Link href={`/sessions/${session.id}`} className="text-blue-600 hover:underline">
+                        {session.sessionName}
+                      </Link>
+                    </div>
                   ) : (
-                    <span className="text-muted-foreground">Not assigned</span>
+                    <span className="text-muted-foreground">Not linked to any session</span>
                   )}
                 </dd>
               </div>

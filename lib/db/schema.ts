@@ -618,7 +618,7 @@ export const transcript = pgTable("transcript", {
   // Language & Type
   language: text("language").notNull(),                      // bo, en, zh, es, de, vi, fr, pt, multi
   kind: text("kind").notNull().default("transcript"),        // transcript, translation
-  spokenSource: text("spoken_source"),                       // teacher, interpreter, mixed, unknown
+  spokenSource: text("spoken_source").notNull().default("primary"), // primary, teacher, interpreter, translator, student, mixed
   spokenLanguage: text("spoken_language"),                   // bo, en, multi, unknown
   translationOf: text("translation_of"),                     // teacher, interpreter, mixed, unknown (when kind=translation)
 

@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations } from "@/lib/db/schema";
+import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -41,11 +41,17 @@ export default async function SessionDetailPage({
         .then((results) => results[0] || null)
     : null;
 
-  // Get assets in this session
-  const sessionAssets = await db
-    .select()
-    .from(archiveAssets)
-    .where(eq(archiveAssets.eventSessionId, params.id));
+  // Get assets in this session via event_session_asset junction table
+  const sessionAssetLinks = await db
+    .select({
+      linkId: eventSessionAsset.id,
+      variantType: eventSessionAsset.variantType,
+      variantLabel: eventSessionAsset.variantLabel,
+      asset: asset,
+    })
+    .from(eventSessionAsset)
+    .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+    .where(eq(eventSessionAsset.eventSessionId, params.id));
 
   // Get topics for this session
   const sessionTopicsList = await db
@@ -225,25 +231,32 @@ export default async function SessionDetailPage({
           {/* Assets in this Session */}
           <div className="rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Assets ({sessionAssets.length})</h2>
+              <h2 className="text-xl font-semibold">Assets ({sessionAssetLinks.length})</h2>
             </div>
-            {sessionAssets.length > 0 ? (
+            {sessionAssetLinks.length > 0 ? (
               <div className="space-y-2">
-                {sessionAssets.map((asset) => (
+                {sessionAssetLinks.map((link) => (
                   <Link
-                    key={asset.id}
-                    href={`/assets/${asset.id}`}
+                    key={link.linkId}
+                    href={`/assets/${link.asset.id}`}
                     className="block p-3 rounded border hover:bg-muted/50"
                   >
-                    <div className="font-medium">{asset.title || asset.name || "Untitled"}</div>
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium">{link.asset.title || link.asset.name || "Untitled"}</div>
+                      {link.variantType && (
+                        <Badge variant="outline" className="text-xs">
+                          {link.variantLabel || link.variantType}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-sm text-muted-foreground">
-                      {asset.assetType || "Unknown type"} • {asset.duration || "No duration"}
+                      {link.asset.assetType || "Unknown type"} • {link.asset.duration || "No duration"}
                     </div>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No assets yet.</p>
+              <p className="text-sm text-muted-foreground">No assets linked to this session yet.</p>
             )}
           </div>
         </div>
