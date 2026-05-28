@@ -31,7 +31,7 @@ export default function RootLayout({
                   <a href="/events" className="text-sm font-medium hover:underline">
                     Events
                   </a>
-                  <a href="/sessions" className="text-sm font-medium text-muted-foreground/50 hover:text-muted-foreground hover:underline">
+                  <a href="/sessions" className="text-sm font-medium hover:underline">
                     Sessions
                   </a>
                   <a href="/assets" className="text-sm font-medium hover:underline">
