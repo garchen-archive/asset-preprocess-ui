@@ -10,6 +10,7 @@ import { deleteEvent } from "@/lib/actions";
 import { formatDate, getDateMeta, type DateMeta } from "@/lib/utils";
 import { BulkAddSessionsButton } from "@/components/bulk-add-sessions-modal";
 import { SessionSequenceEditor, SessionRowActions } from "@/components/session-sequence-editor";
+import { SortableAssetTable } from "@/components/sortable-asset-table";
 
 export const dynamic = "force-dynamic";
 
@@ -587,42 +588,10 @@ export default async function EventDetailPage({
                 <p className="text-xs text-muted-foreground mb-3">
                   Assets assigned directly to this event (not through a session)
                 </p>
-                <div className="rounded-md border">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Duration</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {directEventAssets.map((asset) => (
-                        <tr key={asset.id} className="border-b hover:bg-muted/50">
-                          <td className="px-4 py-3 text-sm">
-                            <Link href={`/assets/${asset.id}`} className="font-medium text-blue-600 hover:underline">
-                              {asset.title || asset.name || "Untitled"}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-3 text-sm">{asset.assetType || "—"}</td>
-                          <td className="px-4 py-3 text-sm">{asset.duration || "—"}</td>
-                          <td className="px-4 py-3 text-sm">
-                            {asset.catalogingStatus ? (
-                              <Badge variant="outline" className="text-xs">{asset.catalogingStatus}</Badge>
-                            ) : "—"}
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <Link href={`/assets/${asset.id}`} className="text-blue-600 hover:underline">
-                              View
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SortableAssetTable
+                  assets={directEventAssets}
+                  tableId="direct"
+                />
               </>
             ) : (
               <p className="text-sm text-muted-foreground">No assets assigned directly to this event.</p>
@@ -639,53 +608,12 @@ export default async function EventDetailPage({
                 <p className="text-xs text-muted-foreground mb-3">
                   Assets assigned to sessions within this event
                 </p>
-                <div className="rounded-md border">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="px-4 py-3 text-left text-sm font-medium">Title</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Duration</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Session</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sessionAssets.map((asset) => {
-                        const session = eventSessions.find(s => s.id === asset.eventSessionId);
-                        return (
-                          <tr key={asset.id} className="border-b hover:bg-muted/50">
-                            <td className="px-4 py-3 text-sm">
-                              <Link href={`/assets/${asset.id}`} className="font-medium text-blue-600 hover:underline">
-                                {asset.title || asset.name || "Untitled"}
-                              </Link>
-                            </td>
-                            <td className="px-4 py-3 text-sm">{asset.assetType || "—"}</td>
-                            <td className="px-4 py-3 text-sm">{asset.duration || "—"}</td>
-                            <td className="px-4 py-3 text-sm">
-                              {session ? (
-                                <Link href={`/sessions/${session.id}`} className="text-blue-600 hover:underline text-xs">
-                                  {session.sessionName}
-                                </Link>
-                              ) : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              {asset.catalogingStatus ? (
-                                <Badge variant="outline" className="text-xs">{asset.catalogingStatus}</Badge>
-                              ) : "—"}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
-                              <Link href={`/assets/${asset.id}`} className="text-blue-600 hover:underline">
-                                View
-                              </Link>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <SortableAssetTable
+                  assets={sessionAssets}
+                  sessions={eventSessions.map((s) => ({ id: s.id, sessionName: s.sessionName }))}
+                  showSessionColumn
+                  tableId="session"
+                />
               </>
             ) : (
               <p className="text-sm text-muted-foreground">No session assets yet.</p>

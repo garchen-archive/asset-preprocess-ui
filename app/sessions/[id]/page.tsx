@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteSession } from "@/lib/actions";
+import { SortableAssetTable } from "@/components/sortable-asset-table";
 
 export const dynamic = "force-dynamic";
 
@@ -235,27 +236,20 @@ export default async function SessionDetailPage({
               <h2 className="text-xl font-semibold">Assets ({sessionAssetLinks.length})</h2>
             </div>
             {sessionAssetLinks.length > 0 ? (
-              <div className="space-y-2">
-                {sessionAssetLinks.map((link) => (
-                  <Link
-                    key={link.linkId}
-                    href={`/assets/${link.asset.id}`}
-                    className="block p-3 rounded border hover:bg-muted/50"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium">{link.asset.title || link.asset.name || "Untitled"}</div>
-                      {link.variantType && (
-                        <Badge variant="outline" className="text-xs">
-                          {link.variantLabel || link.variantType}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {link.asset.assetType || "Unknown type"} • {link.asset.duration || "No duration"}
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              <SortableAssetTable
+                assets={sessionAssetLinks.map((link) => ({
+                  id: link.asset.id,
+                  title: link.asset.title,
+                  name: link.asset.name,
+                  assetType: link.asset.assetType,
+                  duration: link.asset.duration,
+                  catalogingStatus: link.asset.catalogingStatus,
+                  variantType: link.variantType,
+                  variantLabel: link.variantLabel,
+                }))}
+                showVariantColumn
+                tableId="assets"
+              />
             ) : (
               <p className="text-sm text-muted-foreground">No assets linked to this session yet.</p>
             )}
