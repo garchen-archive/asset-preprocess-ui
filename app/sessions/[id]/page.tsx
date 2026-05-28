@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,7 @@ export default async function SessionDetailPage({
         .then((results) => results[0] || null)
     : null;
 
-  // Get assets in this session via event_session_asset junction table
+  // Get assets in this session via event_session_asset junction table, sorted by title
   const sessionAssetLinks = await db
     .select({
       linkId: eventSessionAsset.id,
@@ -51,7 +51,8 @@ export default async function SessionDetailPage({
     })
     .from(eventSessionAsset)
     .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
-    .where(eq(eventSessionAsset.eventSessionId, params.id));
+    .where(eq(eventSessionAsset.eventSessionId, params.id))
+    .orderBy(asc(asset.title), asc(asset.name));
 
   // Get topics for this session
   const sessionTopicsList = await db

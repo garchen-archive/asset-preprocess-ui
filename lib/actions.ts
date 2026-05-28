@@ -2207,3 +2207,112 @@ export async function deleteUser(id: string): Promise<{ error?: string; success?
   return { success: true };
 }
 */
+
+// ============================================================================
+// SESSION SEQUENCE MANAGEMENT
+// ============================================================================
+
+/**
+ * Normalize session sequences for an event.
+ * Assigns sequential numbers (1, 2, 3...) based on current ordering (date/time/name).
+ */
+export async function normalizeEventSequences(eventId: string) {
+  try {
+    // Get all sessions for this event, ordered by current display order
+    const eventSessions = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.eventId, eventId))
+      .orderBy(
+        sql`${sessions.sequence} ASC NULLS LAST`,
+        sessions.sessionDate,
+        sessions.sessionStartTime,
+        sessions.sessionName
+      );
+
+    // Assign sequential numbers
+    for (let i = 0; i < eventSessions.length; i++) {
+      await db
+        .update(sessions)
+        .set({ sequence: i + 1 })
+        .where(eq(sessions.id, eventSessions[i].id));
+    }
+
+    revalidatePath(`/events/${eventId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Normalize sequences error:", error);
+    return { error: `Failed to normalize sequences: ${error?.message || "Unknown error"}` };
+  }
+}
+
+/**
+ * Move a session up or down in the sequence.
+ * Swaps the sequence number with the adjacent session.
+ */
+export async function moveSessionInSequence(
+  sessionId: string,
+  direction: "up" | "down"
+) {
+  try {
+    // Get the session and its event
+    const [session] = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.id, sessionId))
+      .limit(1);
+
+    if (!session || !session.eventId) {
+      return { error: "Session not found or not assigned to an event" };
+    }
+
+    // Get all sessions for this event, ordered by sequence
+    const eventSessions = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.eventId, session.eventId))
+      .orderBy(
+        sql`${sessions.sequence} ASC NULLS LAST`,
+        sessions.sessionDate,
+        sessions.sessionStartTime,
+        sessions.sessionName
+      );
+
+    // Find current index
+    const currentIndex = eventSessions.findIndex((s) => s.id === sessionId);
+    if (currentIndex === -1) {
+      return { error: "Session not found in event" };
+    }
+
+    // Calculate target index
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    // Check bounds
+    if (targetIndex < 0 || targetIndex >= eventSessions.length) {
+      return { error: `Cannot move ${direction}: already at ${direction === "up" ? "top" : "bottom"}` };
+    }
+
+    const currentSession = eventSessions[currentIndex];
+    const targetSession = eventSessions[targetIndex];
+
+    // Swap sequences (or assign if null)
+    const currentSeq = currentSession.sequence ?? currentIndex + 1;
+    const targetSeq = targetSession.sequence ?? targetIndex + 1;
+
+    await db
+      .update(sessions)
+      .set({ sequence: targetSeq })
+      .where(eq(sessions.id, currentSession.id));
+
+    await db
+      .update(sessions)
+      .set({ sequence: currentSeq })
+      .where(eq(sessions.id, targetSession.id));
+
+    revalidatePath(`/events/${session.eventId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Move session error:", error);
+    return { error: `Failed to move session: ${error?.message || "Unknown error"}` };
+  }
+}

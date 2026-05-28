@@ -259,7 +259,7 @@ export const eventSession = pgTable("event_session", {
   sessionTime: text("session_time"), // Time of day: morning, afternoon, evening, night
   sessionStartTime: time("session_start_time"),
   sessionEndTime: time("session_end_time"),
-  // Note: sequenceInEvent removed - ordering belongs to collection_item
+  sequence: integer("sequence"), // Order within event
   topic: text("topic"),
   category: text("category"),
   sessionDescription: text("session_description"),

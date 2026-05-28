@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset } from "@/lib/db/schema";
-import { eq, sql, inArray } from "drizzle-orm";
+import { eq, sql, inArray, asc, desc } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { notFound } from "next/navigation";
 import { deleteEvent } from "@/lib/actions";
 import { formatDate, getDateMeta, type DateMeta } from "@/lib/utils";
 import { BulkAddSessionsButton } from "@/components/bulk-add-sessions-modal";
+import { SessionSequenceEditor, SessionRowActions } from "@/components/session-sequence-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -44,14 +45,19 @@ export default async function EventDetailPage({
   // Extract date metadata for display
   const dateMeta = getDateMeta(event.additionalMetadata);
 
-  // Get sessions in this event, ordered by date and time
+  // Get sessions in this event, ordered by sequence (with fallback to date/time/name)
   const eventSessions = await db
     .select()
     .from(sessions)
     .where(eq(sessions.eventId, params.id))
-    .orderBy(sessions.sessionDate, sessions.sessionStartTime, sessions.sessionName);
+    .orderBy(
+      asc(sessions.sequence),
+      asc(sessions.sessionDate),
+      asc(sessions.sessionStartTime),
+      asc(sessions.sessionName)
+    );
 
-  // Get assets directly assigned to this event (no session)
+  // Get assets directly assigned to this event (no session), sorted by title
   const directEventAssets = await db
     .select({
       id: archiveAssets.id,
@@ -63,9 +69,10 @@ export default async function EventDetailPage({
       catalogingStatus: archiveAssets.catalogingStatus,
     })
     .from(archiveAssets)
-    .where(eq(archiveAssets.eventId, params.id));
+    .where(eq(archiveAssets.eventId, params.id))
+    .orderBy(asc(archiveAssets.title), asc(archiveAssets.name));
 
-  // Get all assets from all sessions in this event via event_session_asset
+  // Get all assets from all sessions in this event via event_session_asset, sorted by title
   const sessionIds = eventSessions.map(s => s.id);
   const sessionAssetLinks = sessionIds.length > 0
     ? await db
@@ -83,6 +90,7 @@ export default async function EventDetailPage({
         .from(eventSessionAsset)
         .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
         .where(inArray(eventSessionAsset.eventSessionId, sessionIds))
+        .orderBy(asc(asset.title), asc(asset.name))
     : [];
 
   // For backwards compatibility, map to same structure
@@ -504,44 +512,66 @@ export default async function EventDetailPage({
               </div>
             </div>
             {eventSessions.length > 0 ? (
-              <div className="rounded-md border">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Time</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Topic</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {eventSessions.map((session) => (
-                      <tr key={session.id} className="border-b hover:bg-muted/50">
-                        <td className="px-4 py-3 text-sm">
-                          <Link href={`/sessions/${session.id}`} className="font-medium text-blue-600 hover:underline">
-                            {session.sessionName}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-3 text-sm">{session.sessionDate || "—"}</td>
-                        <td className="px-4 py-3 text-sm">{session.sessionTime || "—"}</td>
-                        <td className="px-4 py-3 text-sm">{session.topic || "—"}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {session.catalogingStatus ? (
-                            <Badge variant="outline" className="text-xs">{session.catalogingStatus}</Badge>
-                          ) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          <Link href={`/sessions/${session.id}`} className="text-blue-600 hover:underline">
-                            View
-                          </Link>
-                        </td>
+              <>
+                <SessionSequenceEditor
+                  sessions={eventSessions.map((s) => ({
+                    id: s.id,
+                    sessionName: s.sessionName,
+                    sequence: s.sequence,
+                  }))}
+                  eventId={params.id}
+                />
+                <div className="rounded-md border">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="px-2 py-3 text-left text-sm font-medium w-16">Seq</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Time</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Topic</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium w-24">Order</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {eventSessions.map((session, index) => (
+                        <tr key={session.id} className="border-b hover:bg-muted/50">
+                          <td className="px-2 py-3 text-sm text-center text-muted-foreground">
+                            {session.sequence ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <Link href={`/sessions/${session.id}`} className="font-medium text-blue-600 hover:underline">
+                              {session.sessionName}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-3 text-sm">{session.sessionDate || "—"}</td>
+                          <td className="px-4 py-3 text-sm">{session.sessionTime || "—"}</td>
+                          <td className="px-4 py-3 text-sm">{session.topic || "—"}</td>
+                          <td className="px-4 py-3 text-sm">
+                            {session.catalogingStatus ? (
+                              <Badge variant="outline" className="text-xs">{session.catalogingStatus}</Badge>
+                            ) : "—"}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <SessionRowActions
+                              sessionId={session.id}
+                              isFirst={index === 0}
+                              isLast={index === eventSessions.length - 1}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <Link href={`/sessions/${session.id}`} className="text-blue-600 hover:underline">
+                              View
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             ) : (
               <p className="text-sm text-muted-foreground">No sessions yet.</p>
             )}
