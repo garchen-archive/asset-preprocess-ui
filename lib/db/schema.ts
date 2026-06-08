@@ -746,7 +746,7 @@ export const collectionItem = pgTable("collection_item", {
   occurrenceDate: date("occurrence_date", { mode: "string" }),
   dayLabel: text("day_label"),
   isContinuation: boolean("is_continuation").notNull().default(false),
-  relationshipType: text("relationship_type").notNull(), // session, session_variant, supplemental, reference
+  playlistRole: text("playlist_role"), // session, session_variant, supplemental, reference
 
   // System
   metadata: jsonb("metadata").$type<Record<string, any>>(),

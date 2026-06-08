@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset } from "@/lib/db/schema";
-import { eq, sql, inArray, asc, desc } from "drizzle-orm";
+import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem } from "@/lib/db/schema";
+import { eq, sql, inArray, asc, desc, and, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { formatDate, getDateMeta, type DateMeta } from "@/lib/utils";
 import { BulkAddSessionsButton } from "@/components/bulk-add-sessions-modal";
 import { SessionSequenceEditor, SessionRowActions } from "@/components/session-sequence-editor";
 import { SortableAssetTable } from "@/components/sortable-asset-table";
+import { GenerateCollectionButton } from "@/components/generate-collection-button";
 
 export const dynamic = "force-dynamic";
 
@@ -205,6 +206,20 @@ export default async function EventDetailPage({
       name: categories.name,
     })
     .from(categories);
+
+  // Get collections for this event
+  const eventCollections = await db
+    .select({
+      collection: collection,
+      itemCount: sql<number>`
+        (SELECT COUNT(*) FROM collection_item ci WHERE ci.collection_id = ${collection.id})::int
+      `.as("item_count"),
+    })
+    .from(collection)
+    .where(and(eq(collection.eventId, params.id), isNull(collection.deletedAt)))
+    .orderBy(desc(collection.isDefault), asc(collection.name));
+
+  const hasDefaultCollection = eventCollections.some((c) => c.collection.isDefault);
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -575,6 +590,74 @@ export default async function EventDetailPage({
               </>
             ) : (
               <p className="text-sm text-muted-foreground">No sessions yet.</p>
+            )}
+          </div>
+
+          {/* Collections */}
+          <div className="rounded-lg border p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Collections ({eventCollections.length})</h2>
+              <div className="flex gap-2">
+                {eventSessions.length > 0 && (
+                  <GenerateCollectionButton
+                    eventId={params.id}
+                    hasExistingCollection={hasDefaultCollection}
+                  />
+                )}
+              </div>
+            </div>
+            {eventCollections.length > 0 ? (
+              <div className="rounded-md border">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Items</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Visibility</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Default</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventCollections.map(({ collection: c, itemCount }) => (
+                      <tr key={c.id} className="border-b hover:bg-muted/50">
+                        <td className="px-4 py-3 text-sm">
+                          <Link href={`/collections/${c.id}`} className="font-medium text-blue-600 hover:underline">
+                            {c.name}
+                          </Link>
+                          {c.description && (
+                            <p className="text-xs text-muted-foreground truncate max-w-xs">{c.description}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">{itemCount}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <Badge variant="outline" className="text-xs">{c.visibility}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {c.isDefault ? (
+                            <Badge className="bg-green-100 text-green-800 text-xs">Yes</Badge>
+                          ) : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <Link href={`/collections/${c.id}`} className="text-blue-600 hover:underline">
+                            View
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : eventSessions.length > 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground border-2 border-dashed rounded-lg">
+                <p>No collections yet</p>
+                <p className="text-xs mt-1">Click &quot;Generate Default&quot; to create one from sessions</p>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-sm text-muted-foreground border-2 border-dashed rounded-lg">
+                <p>No collections yet</p>
+                <p className="text-xs mt-1">Add sessions first, then generate a collection</p>
+              </div>
             )}
           </div>
 
