@@ -74,6 +74,7 @@ export default async function CollectionDetailPage({
       <Breadcrumbs
         items={[
           { label: "Collections", href: "/collections" },
+          ...(evt ? [{ label: `Event: ${evt.eventName}`, href: `/events/${evt.id}` }] : []),
           { label: c.name },
         ]}
       />
@@ -81,6 +82,14 @@ export default async function CollectionDetailPage({
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
+          {evt && (
+            <p className="text-sm text-muted-foreground mb-1">
+              Collection for{" "}
+              <Link href={`/events/${evt.id}`} className="text-primary hover:underline font-medium">
+                {evt.eventName}
+              </Link>
+            </p>
+          )}
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold">{c.name}</h1>
             {c.isDefault && (
