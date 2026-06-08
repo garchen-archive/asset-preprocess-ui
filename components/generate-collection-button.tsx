@@ -7,13 +7,11 @@ import { useToast } from "@/components/ui/use-toast";
 interface GenerateCollectionButtonProps {
   eventId: string;
   hasExistingCollection: boolean;
-  pipelineUrl?: string;
 }
 
 export function GenerateCollectionButton({
   eventId,
   hasExistingCollection,
-  pipelineUrl = process.env.NEXT_PUBLIC_PIPELINE_URL || "http://localhost:8080",
 }: GenerateCollectionButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -21,30 +19,29 @@ export function GenerateCollectionButton({
   const handleGenerate = async (overwrite: boolean = false) => {
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `${pipelineUrl}/api/v1/admin/events/${eventId}/collections/generate-default`,
-        {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/events/${eventId}/collections/generate-default`,
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": process.env.NEXT_PUBLIC_PIPELINE_API_KEY || "test-key",
-          },
-          body: JSON.stringify({
+          data: {
             overwrite_existing: overwrite,
-          }),
-        }
-      );
+          },
+        }),
+      });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || `HTTP ${response.status}`);
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
       }
-
-      const data = await response.json();
 
       toast({
         title: overwrite ? "Collection regenerated" : "Collection generated",
-        description: `Created ${data.item_count || 0} items from sessions`,
+        description: `Created ${result.data?.item_count || 0} items from sessions`,
       });
 
       // Reload the page to show updated data
