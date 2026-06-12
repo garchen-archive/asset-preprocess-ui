@@ -127,6 +127,18 @@ export function NewEventForm({ eventsList, parentEventId, parentEvent, allTopics
             </div>
 
             <div className="md:col-span-2">
+              <Label htmlFor="eventShortTitle">Short Title</Label>
+              <Input
+                id="eventShortTitle"
+                name="eventShortTitle"
+                placeholder="Brief title for display in lists"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Optional shorter name for menus and compact displays
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
               <Label htmlFor="parentEventId">Parent Event</Label>
               <select
                 id="parentEventId"

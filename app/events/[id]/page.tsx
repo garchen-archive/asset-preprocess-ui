@@ -51,7 +51,7 @@ export default async function EventDetailPage({
   const eventSessions = await db
     .select()
     .from(sessions)
-    .where(eq(sessions.eventId, params.id))
+    .where(and(eq(sessions.eventId, params.id), isNull(sessions.deletedAt)))
     .orderBy(
       asc(sessions.sequence),
       asc(sessions.sessionDate),
@@ -543,6 +543,7 @@ export default async function EventDetailPage({
                       <tr className="border-b bg-muted/50">
                         <th className="px-2 py-3 text-left text-sm font-medium w-16">Seq</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
+                        <th className="px-4 py-3 text-left text-sm font-medium">Day</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Time</th>
                         <th className="px-4 py-3 text-left text-sm font-medium">Topic</th>
@@ -562,6 +563,7 @@ export default async function EventDetailPage({
                               {session.sessionName}
                             </Link>
                           </td>
+                          <td className="px-4 py-3 text-sm">{session.dayLabel || (session.dayNumber ? `Day ${session.dayNumber}` : "—")}</td>
                           <td className="px-4 py-3 text-sm">{session.sessionDate || "—"}</td>
                           <td className="px-4 py-3 text-sm">{session.sessionTime || "—"}</td>
                           <td className="px-4 py-3 text-sm">{session.topic || "—"}</td>
@@ -601,6 +603,14 @@ export default async function EventDetailPage({
                 {eventSessions.length > 0 && (
                   <GenerateCollectionButton
                     eventId={params.id}
+                    eventName={event.eventName}
+                    sessions={eventSessions.map(s => ({
+                      id: s.id,
+                      sessionName: s.sessionName,
+                      dayNumber: s.dayNumber,
+                      dayLabel: s.dayLabel,
+                      sessionDate: s.sessionDate ? String(s.sessionDate).split('T')[0] : null,
+                    }))}
                     hasExistingCollection={hasDefaultCollection}
                   />
                 )}

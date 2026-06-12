@@ -4,6 +4,7 @@ import { eq, asc, and, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +101,9 @@ export default async function CollectionDetailPage({
             <p className="text-muted-foreground mt-1">{c.description}</p>
           )}
         </div>
-        {/* Edit button hidden - editing done via admin project */}
+        <Button asChild>
+          <Link href={`/collections/${params.id}/edit`}>Edit</Link>
+        </Button>
       </div>
 
       {/* Metadata */}

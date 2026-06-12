@@ -209,6 +209,7 @@ export const event = pgTable("event", {
   id: uuid("id").defaultRandom().primaryKey(),
   programId: uuid("program_id").references(() => program.id, { onDelete: "set null" }),
   eventName: text("event_name").notNull(),
+  eventShortTitle: text("event_short_title"),
   eventDateStart: date("event_date_start", { mode: "string" }),
   eventDateEnd: date("event_date_end", { mode: "string" }),
   eventType: text("event_type"),
@@ -263,6 +264,8 @@ export const eventSession = pgTable("event_session", {
   topic: text("topic"),
   category: text("category"),
   sessionDescription: text("session_description"),
+  dayNumber: integer("day_number"), // Which day of the event (1, 2, 3...)
+  dayLabel: text("day_label"), // Display label e.g. "January 15" or "Day 1"
   venueId: uuid("venue_id").references(() => venue.id, { onDelete: "set null" }), // Optional override of event's venue
   spaceLabel: text("space_label"), // Ad-hoc room detail (session-level override)
   durationEstimated: text("duration_estimated"),

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +23,7 @@ export default async function SessionDetailPage({
     })
     .from(sessions)
     .leftJoin(events, eq(sessions.eventId, events.id))
-    .where(eq(sessions.id, params.id))
+    .where(and(eq(sessions.id, params.id), isNull(sessions.deletedAt)))
     .limit(1);
 
   if (!sessionData) {
@@ -122,6 +122,20 @@ export default async function SessionDetailPage({
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Session Date</dt>
                 <dd className="text-sm mt-1">{session.sessionDate || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Day Number</dt>
+                <dd className="text-sm mt-1">
+                  {session.dayNumber ? (
+                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                      Day {session.dayNumber}
+                    </span>
+                  ) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Day Label</dt>
+                <dd className="text-sm mt-1">{session.dayLabel || "—"}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Session Time</dt>
@@ -314,7 +328,9 @@ export default async function SessionDetailPage({
             <p className="text-sm text-muted-foreground mb-4">
               Deleting this session cannot be undone.
             </p>
-            <form action={deleteSession.bind(null, params.id)}>
+            <form action={deleteSession}>
+              <input type="hidden" name="id" value={params.id} />
+              <input type="hidden" name="redirectTo" value="/sessions" />
               <Button type="submit" variant="destructive" size="sm">
                 Delete Session
               </Button>

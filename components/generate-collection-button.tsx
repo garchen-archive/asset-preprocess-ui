@@ -3,20 +3,35 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
+import { GenerateCollectionModal } from "./generate-collection-modal";
+
+interface Session {
+  id: string;
+  sessionName: string;
+  dayNumber?: number | null;
+  dayLabel?: string | null;
+  sessionDate?: string | null;
+}
 
 interface GenerateCollectionButtonProps {
   eventId: string;
+  eventName?: string;
+  sessions?: Session[];
   hasExistingCollection: boolean;
 }
 
 export function GenerateCollectionButton({
   eventId,
+  eventName = "Event",
+  sessions = [],
   hasExistingCollection,
 }: GenerateCollectionButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
   const { toast } = useToast();
 
-  const handleGenerate = async (overwrite: boolean = false) => {
+  // Quick generate without modal (for simple use case)
+  const handleQuickGenerate = async (overwrite: boolean = false) => {
     setIsLoading(true);
     try {
       const response = await fetch("/api/pipeline", {
@@ -41,7 +56,7 @@ export function GenerateCollectionButton({
 
       toast({
         title: overwrite ? "Collection regenerated" : "Collection generated",
-        description: `Created ${result.data?.item_count || 0} items from sessions`,
+        description: `Created ${result.data?.items?.length || 0} items from sessions`,
       });
 
       // Reload the page to show updated data
@@ -57,26 +72,46 @@ export function GenerateCollectionButton({
     }
   };
 
+  // If sessions are provided, show the modal option
+  const hasSessions = sessions.length > 0;
+
   return (
-    <div className="flex gap-2">
-      {hasExistingCollection ? (
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => handleGenerate(true)}
-          disabled={isLoading}
-        >
-          {isLoading ? "Regenerating..." : "Regenerate"}
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          onClick={() => handleGenerate(false)}
-          disabled={isLoading}
-        >
-          {isLoading ? "Generating..." : "Generate Default"}
-        </Button>
+    <>
+      <div className="flex gap-2">
+        {hasExistingCollection ? (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => hasSessions ? setShowModal(true) : handleQuickGenerate(true)}
+              disabled={isLoading}
+            >
+              {isLoading ? "Regenerating..." : "Regenerate"}
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            onClick={() => hasSessions ? setShowModal(true) : handleQuickGenerate(false)}
+            disabled={isLoading}
+          >
+            {isLoading ? "Generating..." : "Generate Default"}
+          </Button>
+        )}
+      </div>
+
+      {showModal && (
+        <GenerateCollectionModal
+          eventId={eventId}
+          eventName={eventName}
+          sessions={sessions}
+          hasExistingCollection={hasExistingCollection}
+          onClose={() => setShowModal(false)}
+          onSuccess={() => {
+            // Page will reload in the modal
+          }}
+        />
       )}
-    </div>
+    </>
   );
 }
