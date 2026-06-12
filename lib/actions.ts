@@ -329,6 +329,7 @@ export async function createEvent(prevState: { error: string } | undefined, form
 
   const data = {
     eventName: formData.get("eventName") as string,
+    eventShortTitle: formData.get("eventShortTitle") as string || null,
     parentEventId: parentEventIdStr && parentEventIdStr !== "" ? parentEventIdStr : null,
     hostOrganizationId: hostOrganizationIdStr && hostOrganizationIdStr !== "" ? hostOrganizationIdStr : null,
     organizerOrganizationId: organizerOrganizationIdStr && organizerOrganizationIdStr !== "" ? organizerOrganizationIdStr : null,
@@ -460,6 +461,7 @@ export async function updateEvent(id: string, formData: FormData) {
 
   const data = {
     eventName: formData.get("eventName") as string,
+    eventShortTitle: formData.get("eventShortTitle") as string || null,
     parentEventId: parentEventIdStr && parentEventIdStr !== "" ? parentEventIdStr : null,
     hostOrganizationId: hostOrganizationIdStr && hostOrganizationIdStr !== "" ? hostOrganizationIdStr : null,
     organizerOrganizationId: organizerOrganizationIdStr && organizerOrganizationIdStr !== "" ? organizerOrganizationIdStr : null,
@@ -529,26 +531,48 @@ export async function assignEventAsChild(eventId: string, parentEventId: string)
 // ============================================================================
 
 export async function createSession(formData: FormData) {
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
+
   // Extract topic and category IDs from form data
   const topicIds = formData.getAll("topicIds") as string[];
   const categoryIds = formData.getAll("categoryIds") as string[];
 
-  const data = {
-    eventId: formData.get("eventId") as string || null,
-    sessionName: formData.get("sessionName") as string,
-    sessionDate: formData.get("sessionDate") as string || null,
-    sessionTime: formData.get("sessionTime") as string || null,
-    sessionStartTime: formData.get("sessionStartTime") as string || null,
-    sessionEndTime: formData.get("sessionEndTime") as string || null,
-    sessionDescription: formData.get("sessionDescription") as string || null,
-    durationEstimated: formData.get("durationEstimated") as string || null,
-    catalogingStatus: formData.get("catalogingStatus") as string || null,
-    notes: formData.get("notes") as string || null,
-  };
+  const eventId = formData.get("eventId") as string;
+  if (!eventId) {
+    throw new Error("eventId is required");
+  }
 
-  const [newSession] = await db.insert(sessions).values(data).returning();
+  // Call pipeline API to create session (auto-populates day_number/day_label)
+  const response = await fetch(
+    `${PIPELINE_API_URL}/api/v1/admin/events/${eventId}/sessions`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": PIPELINE_API_KEY,
+      },
+      body: JSON.stringify({
+        session_name: formData.get("sessionName") as string,
+        session_date: formData.get("sessionDate") as string || null,
+        session_start_time: formData.get("sessionStartTime") as string || null,
+        session_end_time: formData.get("sessionEndTime") as string || null,
+        session_description: formData.get("sessionDescription") as string || null,
+        notes: formData.get("notes") as string || null,
+        day_number: formData.get("dayNumber") ? parseInt(formData.get("dayNumber") as string, 10) : null,
+        day_label: formData.get("dayLabel") as string || null,
+      }),
+    }
+  );
 
-  // Create junction table entries for topics
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to create session: ${errorText}`);
+  }
+
+  const newSession = await response.json();
+
+  // Create junction table entries for topics (still direct DB - pipeline doesn't handle these)
   if (topicIds.length > 0) {
     await db.insert(sessionTopics).values(
       topicIds.map(topicId => ({
@@ -573,12 +597,15 @@ export async function createSession(formData: FormData) {
 }
 
 export async function updateSession(id: string, formData: FormData) {
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
+
   // Parse additional metadata JSON
-  let additionalMetadata = null;
+  let metadata: Record<string, any> | undefined = undefined;
   const additionalMetadataStr = formData.get("additionalMetadata") as string;
   if (additionalMetadataStr && additionalMetadataStr.trim()) {
     try {
-      additionalMetadata = JSON.parse(additionalMetadataStr);
+      metadata = JSON.parse(additionalMetadataStr);
     } catch (e) {
       console.error("Invalid JSON in additionalMetadata:", e);
     }
@@ -588,24 +615,35 @@ export async function updateSession(id: string, formData: FormData) {
   const topicIds = formData.getAll("topicIds") as string[];
   const categoryIds = formData.getAll("categoryIds") as string[];
 
-  const data = {
-    eventId: formData.get("eventId") as string || null,
-    sessionName: formData.get("sessionName") as string,
-    sessionDate: formData.get("sessionDate") as string || null,
-    sessionTime: formData.get("sessionTime") as string || null,
-    sessionStartTime: formData.get("sessionStartTime") as string || null,
-    sessionEndTime: formData.get("sessionEndTime") as string || null,
-    sessionDescription: formData.get("sessionDescription") as string || null,
-    durationEstimated: formData.get("durationEstimated") as string || null,
-    catalogingStatus: formData.get("catalogingStatus") as string || null,
-    notes: formData.get("notes") as string || null,
-    additionalMetadata,
-    updatedAt: new Date(),
-  };
+  // Call pipeline API to update session (does not recalculate day_number/day_label)
+  const response = await fetch(
+    `${PIPELINE_API_URL}/api/v1/admin/sessions/${id}`,
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": PIPELINE_API_KEY,
+      },
+      body: JSON.stringify({
+        session_name: formData.get("sessionName") as string,
+        session_date: formData.get("sessionDate") as string || null,
+        session_start_time: formData.get("sessionStartTime") as string || null,
+        session_end_time: formData.get("sessionEndTime") as string || null,
+        session_description: formData.get("sessionDescription") as string || null,
+        notes: formData.get("notes") as string || null,
+        day_number: formData.get("dayNumber") ? parseInt(formData.get("dayNumber") as string) : undefined,
+        day_label: formData.get("dayLabel") as string || undefined,
+        metadata,
+      }),
+    }
+  );
 
-  await db.update(sessions).set(data).where(eq(sessions.id, id));
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update session: ${errorText}`);
+  }
 
-  // Delete existing junction table entries
+  // Delete existing junction table entries (still direct DB - pipeline doesn't handle these)
   await db.delete(sessionTopics).where(eq(sessionTopics.eventSessionId, id));
   await db.delete(sessionCategories).where(eq(sessionCategories.eventSessionId, id));
 
@@ -633,11 +671,45 @@ export async function updateSession(id: string, formData: FormData) {
   redirect(`/sessions/${id}`);
 }
 
-export async function deleteSession(id: string) {
-  await db.delete(sessions).where(eq(sessions.id, id));
+// For form-based delete (session detail page)
+export async function deleteSession(formData: FormData) {
+  const id = formData.get("id") as string;
+  const redirectTo = formData.get("redirectTo") as string | null;
+
+  if (!id) {
+    throw new Error("Session ID is required");
+  }
+
+  await deleteSessionById(id);
+
+  if (redirectTo) {
+    redirect(redirectTo);
+  }
+}
+
+// For programmatic delete (client components)
+export async function deleteSessionById(id: string) {
+  const PIPELINE_API_URL = process.env.PIPELINE_API_URL || "http://localhost:8080";
+  const PIPELINE_API_KEY = process.env.PIPELINE_API_KEY || "";
+
+  // Call pipeline API to delete session (soft delete)
+  const response = await fetch(
+    `${PIPELINE_API_URL}/api/v1/admin/sessions/${id}`,
+    {
+      method: "DELETE",
+      headers: {
+        "X-API-Key": PIPELINE_API_KEY,
+      },
+    }
+  );
+
+  if (!response.ok && response.status !== 204) {
+    const errorText = await response.text();
+    throw new Error(`Failed to delete session: ${errorText}`);
+  }
 
   revalidatePath("/sessions");
-  redirect("/sessions");
+  revalidatePath("/events");
 }
 
 interface BulkSessionData {

@@ -76,6 +76,32 @@ export function NewSessionForm({ eventsList, defaultEventId, allTopics, allCateg
             </div>
 
             <div>
+              <Label htmlFor="dayNumber">Day Number</Label>
+              <Input
+                id="dayNumber"
+                name="dayNumber"
+                type="number"
+                min="1"
+                placeholder="e.g., 1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-calculated from date if left blank
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="dayLabel">Day Label</Label>
+              <Input
+                id="dayLabel"
+                name="dayLabel"
+                placeholder="e.g., Day 1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-calculated from date if left blank
+              </p>
+            </div>
+
+            <div>
               <Label htmlFor="sessionStartTime">Start Time</Label>
               <Input id="sessionStartTime" name="sessionStartTime" type="time" />
               <p className="text-xs text-muted-foreground mt-1">Optional: Specific start time</p>

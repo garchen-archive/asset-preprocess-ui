@@ -96,6 +96,34 @@ export function EditSessionForm({
             </div>
 
             <div>
+              <Label htmlFor="dayNumber">Day Number</Label>
+              <Input
+                id="dayNumber"
+                name="dayNumber"
+                type="number"
+                min="1"
+                defaultValue={session.dayNumber || ""}
+                placeholder="Auto-calculated on create"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Which day of the event (1, 2, 3...)
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="dayLabel">Day Label</Label>
+              <Input
+                id="dayLabel"
+                name="dayLabel"
+                defaultValue={session.dayLabel || ""}
+                placeholder="e.g., January 15 or Day 1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Display label for grouping
+              </p>
+            </div>
+
+            <div>
               <Label htmlFor="sessionTime">Session Time</Label>
               <Input
                 id="sessionTime"

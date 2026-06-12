@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { sessions, events } from "@/lib/db/schema";
-import { desc, eq, sql, and, ilike, or } from "drizzle-orm";
+import { desc, eq, sql, and, ilike, or, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +25,8 @@ export default async function SessionsPage({
   const perPage = 50;
   const offset = (page - 1) * perPage;
 
-  // Build where conditions
-  const conditions = [];
+  // Build where conditions - always filter out soft-deleted sessions
+  const conditions = [isNull(sessions.deletedAt)];
 
   if (search) {
     conditions.push(
@@ -50,7 +50,7 @@ export default async function SessionsPage({
   const [{ count }] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(sessions)
-    .where(conditions.length > 0 ? and(...conditions) : undefined);
+    .where(and(...conditions));
 
   const totalPages = Math.ceil(count / perPage);
 
@@ -61,7 +61,7 @@ export default async function SessionsPage({
     })
     .from(sessions)
     .leftJoin(events, eq(sessions.eventId, events.id))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(sessions.createdAt))
     .limit(perPage)
     .offset(offset);
@@ -149,6 +149,7 @@ export default async function SessionsPage({
               <th className="px-4 py-3 text-left text-sm font-medium">Session Name</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Event</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Date</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Day</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Duration</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
@@ -161,6 +162,14 @@ export default async function SessionsPage({
                 <td className="px-4 py-3 text-sm">{session.sessionName}</td>
                 <td className="px-4 py-3 text-sm">{event?.eventName || "—"}</td>
                 <td className="px-4 py-3 text-sm">{session.sessionDate || "—"}</td>
+                <td className="px-4 py-3 text-sm">
+                  {session.dayNumber ? (
+                    <span className="inline-flex items-center gap-1">
+                      <span className="font-medium">Day {session.dayNumber}</span>
+                      {session.dayLabel && <span className="text-muted-foreground text-xs">({session.dayLabel})</span>}
+                    </span>
+                  ) : "—"}
+                </td>
                 <td className="px-4 py-3 text-sm">{session.durationEstimated || "—"}</td>
                 <td className="px-4 py-3 text-sm">
                   <span
