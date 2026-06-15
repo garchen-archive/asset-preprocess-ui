@@ -38,6 +38,7 @@ type EventsPageClientProps = {
   eventsList: EventRow[];
   organizations: { id: string; code: string; name: string }[];
   availableTypes: string[];
+  availableTopics: { id: string; name: string }[];
   offset: number;
   sortBy: string;
   sortOrder: string;
@@ -48,6 +49,7 @@ export function EventsPageClient({
   eventsList,
   organizations,
   availableTypes,
+  availableTopics,
   offset,
   sortBy,
   sortOrder,
@@ -264,6 +266,7 @@ export function EventsPageClient({
           selectedEventIds={selectedEventIds}
           organizations={organizations}
           availableTypes={availableTypes}
+          availableTopics={availableTopics}
           onClose={() => setShowBulkEditModal(false)}
           onSuccess={handleBulkEditSuccess}
         />

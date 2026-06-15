@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { OrgSelect } from "@/components/org-select";
-import { bulkUpdateEvents } from "@/lib/actions";
+import { MultiSelectWithCreate } from "@/components/multi-select-with-create";
+import { bulkUpdateEvents, bulkAssignTopicsToEvents } from "@/lib/actions";
 
 interface EventsBulkEditModalProps {
   selectedEventIds: string[];
   organizations: { id: string; code: string; name: string }[];
   availableTypes: string[];
+  availableTopics: { id: string; name: string }[];
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -32,6 +34,7 @@ export function EventsBulkEditModal({
   selectedEventIds,
   organizations,
   availableTypes,
+  availableTopics,
   onClose,
   onSuccess,
 }: EventsBulkEditModalProps) {
@@ -47,6 +50,7 @@ export function EventsBulkEditModal({
   const [eventType, setEventType] = useState("");
   const [eventFormat, setEventFormat] = useState("");
   const [catalogingStatus, setCatalogingStatus] = useState("Not Started");
+  const [topicIds, setTopicIds] = useState<string[]>([]);
 
   const toggleField = (field: string) => {
     setEnabledFields((prev) => ({ ...prev, [field]: !prev[field] }));
@@ -65,23 +69,45 @@ export function EventsBulkEditModal({
       if (enabledFields.eventFormat) updates.eventFormat = eventFormat || null;
       if (enabledFields.catalogingStatus) updates.catalogingStatus = catalogingStatus || null;
 
-      if (Object.keys(updates).length === 0) {
+      const hasFieldUpdates = Object.keys(updates).length > 0;
+      const hasTopicAssignment = enabledFields.topicIds && topicIds.length > 0;
+
+      if (!hasFieldUpdates && !hasTopicAssignment) {
         setError("Please select at least one field to update");
         setIsSubmitting(false);
         return;
       }
 
-      const result = await bulkUpdateEvents({
-        eventIds: selectedEventIds,
-        updates,
-      });
+      // Update event fields if any are selected
+      if (hasFieldUpdates) {
+        const result = await bulkUpdateEvents({
+          eventIds: selectedEventIds,
+          updates,
+        });
 
-      if (result.success) {
-        onSuccess();
-        onClose();
-      } else {
-        setError(result.error || "Failed to update events");
+        if (!result.success) {
+          setError(result.error || "Failed to update events");
+          setIsSubmitting(false);
+          return;
+        }
       }
+
+      // Assign topics if selected
+      if (hasTopicAssignment) {
+        const result = await bulkAssignTopicsToEvents({
+          eventIds: selectedEventIds,
+          topicIds,
+        });
+
+        if (!result.success) {
+          setError(result.error || "Failed to assign topics");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      onSuccess();
+      onClose();
     } catch (err) {
       setError("An unexpected error occurred");
     } finally {
@@ -218,6 +244,30 @@ export function EventsBulkEditModal({
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
+            </FieldRow>
+          </div>
+
+          {/* Classification Section */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700 border-b pb-1">Classification</h3>
+
+            <FieldRow
+              label="Assign Topics"
+              enabled={enabledFields.topicIds}
+              onToggle={() => toggleField("topicIds")}
+            >
+              <div className={!enabledFields.topicIds ? "opacity-50 pointer-events-none" : ""}>
+                <MultiSelectWithCreate
+                  name="topicIds"
+                  label=""
+                  availableItems={availableTopics}
+                  selectedIds={topicIds}
+                  onSelectionChange={setTopicIds}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Adds selected topics to all events (won't remove existing topics)
+              </p>
             </FieldRow>
           </div>
         </div>

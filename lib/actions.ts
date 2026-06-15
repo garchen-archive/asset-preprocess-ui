@@ -1698,6 +1698,48 @@ export async function bulkUpdateEvents({
 }
 
 // ============================================================================
+// BULK ASSIGN TOPIC TO EVENTS
+// ============================================================================
+
+export async function bulkAssignTopicsToEvents({
+  eventIds,
+  topicIds,
+}: {
+  eventIds: string[];
+  topicIds: string[];
+}) {
+  try {
+    if (!eventIds || eventIds.length === 0) {
+      return { success: false, error: "No events selected" };
+    }
+    if (!topicIds || topicIds.length === 0) {
+      return { success: false, error: "No topics selected" };
+    }
+
+    // Insert into event_topics junction table for each event-topic pair, skip if already exists
+    await Promise.all(
+      eventIds.flatMap((eventId) =>
+        topicIds.map(async (topicId) => {
+          await db
+            .insert(eventTopics)
+            .values({
+              eventId,
+              topicId,
+            })
+            .onConflictDoNothing();
+        })
+      )
+    );
+
+    revalidatePath("/events");
+    return { success: true, assignedCount: eventIds.length * topicIds.length };
+  } catch (error: any) {
+    console.error("Bulk assign topics error:", error);
+    return { success: false, error: error.message || "Failed to assign topics" };
+  }
+}
+
+// ============================================================================
 // ORGANIZATION CSV IMPORT (Upsert with merge/fill-only for addresses)
 // ============================================================================
 

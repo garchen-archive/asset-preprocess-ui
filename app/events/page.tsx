@@ -298,7 +298,7 @@ export default async function EventsPage({
     .offset(offset);
 
   // Fetch distinct values for filter dropdowns + organizations for bulk edit
-  const [types, organizers, hostingCenters, countries, locationCountries, locationTexts, allOrganizations, distinctTopics, distinctCategories] = await Promise.all([
+  const [types, organizers, hostingCenters, countries, locationCountries, locationTexts, allOrganizations, distinctTopics, distinctCategories, allTopics] = await Promise.all([
     // Distinct event types
     db
       .selectDistinct({ type: events.eventType })
@@ -376,7 +376,7 @@ export default async function EventsPage({
       .from(organizations)
       .orderBy(organizations.name),
 
-    // Topics that are assigned to at least one event (via join table)
+    // Topics that are assigned to at least one event (via join table) - for filtering
     db
       .selectDistinct({ id: topics.id, name: topics.name })
       .from(topics)
@@ -389,6 +389,12 @@ export default async function EventsPage({
       .from(categories)
       .innerJoin(eventCategories, eq(categories.id, eventCategories.categoryId))
       .orderBy(categories.name),
+
+    // All topics - for bulk assignment
+    db
+      .select({ id: topics.id, name: topics.name })
+      .from(topics)
+      .orderBy(topics.name),
   ]);
 
   return (
@@ -444,6 +450,7 @@ export default async function EventsPage({
         eventsList={eventsList}
         organizations={allOrganizations}
         availableTypes={types.map((t) => t.type).filter(Boolean) as string[]}
+        availableTopics={allTopics}
         offset={offset}
         sortBy={sortBy}
         sortOrder={sortOrder}
