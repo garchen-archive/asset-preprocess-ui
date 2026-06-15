@@ -94,6 +94,43 @@ export function ReorderableCollectionItems({
     setHasChanges(false);
   };
 
+  const removeItem = async (itemId: string) => {
+    if (!confirm("Remove this item from the collection?")) return;
+
+    setIsUpdating(itemId);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/collections/${collectionId}/items/${itemId}`,
+          method: "DELETE",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || "Failed to remove item");
+      }
+
+      // Remove from local state
+      setItems(items.filter(item => item.id !== itemId));
+      toast({
+        title: "Item removed",
+        description: "The item has been removed from the collection.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove item",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
   return (
     <div>
       {/* Save/Reset buttons when there are changes */}
@@ -130,7 +167,7 @@ export function ReorderableCollectionItems({
                 <th className="px-4 py-3 text-left text-sm font-medium">Session/Asset</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Day</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-                <th className="px-4 py-3 text-left text-sm font-medium w-24">Reorder</th>
+                <th className="px-4 py-3 text-left text-sm font-medium w-32">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -202,6 +239,18 @@ export function ReorderableCollectionItems({
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => removeItem(item.id)}
+                        disabled={isUpdating !== null}
+                        title="Remove from collection"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </Button>
                     </div>
