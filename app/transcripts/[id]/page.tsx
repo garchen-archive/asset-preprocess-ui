@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DeleteTranscriptButton } from "@/components/delete-transcript-button";
 import { BackblazeLink } from "@/components/backblaze-link";
+import { getVariantLabel } from "@/lib/variant-types";
 
 export const dynamic = "force-dynamic";
 
@@ -364,8 +365,8 @@ export default async function TranscriptDetailPage({
               <div className="space-y-3">
                 <div>
                   <dt className="text-xs font-medium text-muted-foreground">Variant</dt>
-                  <dd className="mt-0.5 text-sm capitalize">
-                    {sessionAsset.variantLabel || sessionAsset.variantType}
+                  <dd className="mt-0.5 text-sm">
+                    {sessionAsset.variantLabel || getVariantLabel(sessionAsset.variantType)}
                   </dd>
                 </div>
                 <div>

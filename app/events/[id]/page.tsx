@@ -76,10 +76,11 @@ export default async function EventDetailPage({
 
   // Get all assets from all sessions in this event via event_session_asset, sorted by title
   const sessionIds = eventSessions.map(s => s.id);
-  const sessionAssetLinks = sessionIds.length > 0
+  const sessionAssetLinksRaw = sessionIds.length > 0
     ? await db
         .select({
           id: asset.id,
+          linkId: eventSessionAsset.id,
           title: asset.title,
           name: asset.name,
           assetType: asset.assetType,
@@ -94,6 +95,19 @@ export default async function EventDetailPage({
         .where(inArray(eventSessionAsset.eventSessionId, sessionIds))
         .orderBy(asc(asset.title), asc(asset.name))
     : [];
+
+  // Build map of session ID -> canonical asset ID
+  const sessionCanonicalMap = new Map(
+    eventSessions
+      .filter(s => s.canonicalEventSessionAssetId)
+      .map(s => [s.id, s.canonicalEventSessionAssetId])
+  );
+
+  // Compute isCanonical from session FK
+  const sessionAssetLinks = sessionAssetLinksRaw.map(link => ({
+    ...link,
+    isCanonical: sessionCanonicalMap.get(link.eventSessionId) === link.linkId,
+  }));
 
   // For backwards compatibility, map to same structure
   const sessionAssets = sessionAssetLinks;
@@ -207,16 +221,22 @@ export default async function EventDetailPage({
     })
     .from(categories);
 
-  // Get collections for this event
+  // Get collections for this event with item counts
   const eventCollections = await db
     .select({
       collection: collection,
-      itemCount: sql<number>`
-        (SELECT COUNT(*) FROM collection_item ci WHERE ci.collection_id = ${collection.id})::int
-      `.as("item_count"),
+      itemCount: sql<number>`count(${collectionItem.id})::int`.as("item_count"),
     })
     .from(collection)
+    .leftJoin(
+      collectionItem,
+      and(
+        eq(collectionItem.collectionId, collection.id),
+        isNull(collectionItem.deletedAt)
+      )
+    )
     .where(and(eq(collection.eventId, params.id), isNull(collection.deletedAt)))
+    .groupBy(collection.id)
     .orderBy(desc(collection.isDefault), asc(collection.name));
 
   const hasDefaultCollection = eventCollections.some((c) => c.collection.isDefault);

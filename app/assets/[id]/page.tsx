@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { BackblazeLink } from "@/components/backblaze-link";
 import { MuxVideoPlayer } from "@/components/mux-video-player";
+import { getVariantLabel } from "@/lib/variant-types";
 
 export const dynamic = "force-dynamic";
 
@@ -758,7 +759,7 @@ export default async function AssetDetailPage({
                           </Link>
                           {link.variantType && (
                             <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700">
-                              {link.variantLabel || link.variantType}
+                              {link.variantLabel || getVariantLabel(link.variantType)}
                             </span>
                           )}
                           {link.event && (

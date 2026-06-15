@@ -292,15 +292,16 @@ export type NewSession = NewEventSession;
 
 // ============================================================================
 // EVENT_SESSION_ASSET
-// Media variants for sessions (camera angles, masters, backups, etc.)
+// Media variants for sessions (camera angles, sources, backups, etc.)
 // ============================================================================
 
 export const eventSessionAsset = pgTable("event_session_asset", {
   id: uuid("id").defaultRandom().primaryKey(),
   eventSessionId: uuid("event_session_id").notNull().references(() => eventSession.id, { onDelete: "cascade" }),
   assetId: uuid("asset_id").notNull().references(() => asset.id, { onDelete: "cascade" }),
-  variantType: text("variant_type").notNull(), // camera_angle, master, backup, audio_only, edited, other
+  variantType: text("variant_type").notNull(), // source, edited, camera_angle, audio, backup, alternate
   variantLabel: text("variant_label"),
+  // Note: canonical status is tracked via event_session.canonical_event_session_asset_id FK
   metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -755,6 +756,7 @@ export const collectionItem = pgTable("collection_item", {
   metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export type CollectionItem = typeof collectionItem.$inferSelect;

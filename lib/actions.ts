@@ -9,6 +9,7 @@ import { eq, sql, inArray, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dateCertaintyToMeta, type DateCertainty } from "@/lib/utils";
+import { DEFAULT_VARIANT_TYPE, DEFAULT_VARIANT_LABEL } from "@/lib/variant-types";
 
 function parseCoord(value: string | null): number | null {
   if (!value) return null;
@@ -192,8 +193,8 @@ export async function updateAsset(id: string, formData: FormData) {
             },
             body: JSON.stringify({
               asset_id: id,
-              variant_type: "primary",
-              variant_label: "Main Recording",
+              variant_type: DEFAULT_VARIANT_TYPE,
+              variant_label: DEFAULT_VARIANT_LABEL,
             }),
           }
         );
@@ -1450,8 +1451,8 @@ export async function bulkAssignAssets({
               },
               body: JSON.stringify({
                 asset_id: assetId,
-                variant_type: "primary",
-                variant_label: "Main Recording",
+                variant_type: DEFAULT_VARIANT_TYPE,
+                variant_label: DEFAULT_VARIANT_LABEL,
               }),
             }
           );

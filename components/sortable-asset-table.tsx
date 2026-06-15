@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { usePathname, useSearchParams } from "next/navigation";
+import { getVariantLabel } from "@/lib/variant-types";
 
 type AssetRow = {
   id: string;
@@ -14,6 +15,7 @@ type AssetRow = {
   eventSessionId?: string | null;
   variantType?: string | null;
   variantLabel?: string | null;
+  isCanonical?: boolean | null;
 };
 
 type Session = {
@@ -177,13 +179,18 @@ export function SortableAssetTable({
                 )}
                 {showVariantColumn && (
                   <td className="px-4 py-3 text-sm">
-                    {asset.variantLabel || asset.variantType ? (
-                      <Badge variant="outline" className="text-xs">
-                        {asset.variantLabel || asset.variantType}
-                      </Badge>
-                    ) : (
-                      "—"
-                    )}
+                    <div className="flex items-center gap-1">
+                      {asset.isCanonical && (
+                        <Badge className="bg-green-100 text-green-800 text-xs">Canonical</Badge>
+                      )}
+                      {asset.variantLabel || asset.variantType ? (
+                        <Badge variant="outline" className="text-xs">
+                          {asset.variantLabel || getVariantLabel(asset.variantType)}
+                        </Badge>
+                      ) : (
+                        !asset.isCanonical && "—"
+                      )}
+                    </div>
                   </td>
                 )}
                 <td className="px-4 py-3 text-sm">
