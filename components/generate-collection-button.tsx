@@ -28,6 +28,7 @@ export function GenerateCollectionButton({
 }: GenerateCollectionButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
   const { toast } = useToast();
 
   // Quick generate without modal (for simple use case)
@@ -75,20 +76,37 @@ export function GenerateCollectionButton({
   // If sessions are provided, show the modal option
   const hasSessions = sessions.length > 0;
 
+  const handleRegenerateClick = () => {
+    if (hasExistingCollection) {
+      setShowOverwriteWarning(true);
+    } else if (hasSessions) {
+      setShowModal(true);
+    } else {
+      handleQuickGenerate(false);
+    }
+  };
+
+  const handleConfirmRegenerate = () => {
+    setShowOverwriteWarning(false);
+    if (hasSessions) {
+      setShowModal(true);
+    } else {
+      handleQuickGenerate(true);
+    }
+  };
+
   return (
     <>
       <div className="flex gap-2">
         {hasExistingCollection ? (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => hasSessions ? setShowModal(true) : handleQuickGenerate(true)}
-              disabled={isLoading}
-            >
-              {isLoading ? "Regenerating..." : "Regenerate"}
-            </Button>
-          </>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRegenerateClick}
+            disabled={isLoading}
+          >
+            {isLoading ? "Regenerating..." : "Regenerate"}
+          </Button>
         ) : (
           <Button
             size="sm"
@@ -99,6 +117,37 @@ export function GenerateCollectionButton({
           </Button>
         )}
       </div>
+
+      {/* Overwrite Warning Dialog */}
+      {showOverwriteWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h3 className="text-lg font-semibold text-amber-700 mb-2">
+              Regenerate Collection?
+            </h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              This will <strong>replace all existing items</strong> in the collection.
+              Any manual changes you've made (removed items, reordering, custom labels) will be lost.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOverwriteWarning(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={handleConfirmRegenerate}
+              >
+                Regenerate Anyway
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <GenerateCollectionModal
