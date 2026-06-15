@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "@/components/searchable-select";
 import { AsyncSearchableSelect } from "@/components/async-searchable-select";
 import { createTranscript, updateTranscript } from "@/lib/actions";
+import { getVariantLabel } from "@/lib/variant-types";
 
 const LANGUAGE_OPTIONS = [
   { value: "bo", label: "Tibetan" },
@@ -172,7 +173,7 @@ export function TranscriptForm({
     .filter((sa) => sa.eventSessionId === eventSessionId)
     .map((sa) => ({
       value: sa.id,
-      label: `${sa.assetTitle || sa.assetName || "Unknown"} - ${sa.variantLabel || sa.variantType}`,
+      label: `${sa.assetTitle || sa.assetName || "Unknown"} - ${sa.variantLabel || getVariantLabel(sa.variantType)}`,
     }));
 
   // Handle session change - clear session asset when session changes

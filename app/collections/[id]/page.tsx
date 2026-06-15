@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ReorderableCollectionItems } from "@/components/reorderable-collection-items";
 
 export const dynamic = "force-dynamic";
 
@@ -140,77 +141,26 @@ export default async function CollectionDetailPage({
       <div>
         <h2 className="text-xl font-semibold mb-4">Collection Items</h2>
 
-        {items.length > 0 ? (
-          <div className="rounded-lg border">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-medium w-16">#</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Label</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Session/Asset</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Day</th>
-                  <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {items.map(({ item, sessionName, sessionDate, assetTitle }) => (
-                  <tr key={item.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {item.sequence}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="font-medium">{item.label || "—"}</span>
-                      {item.isContinuation && (
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          Continuation
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.eventSessionId && sessionName && (
-                        <Link
-                          href={`/sessions/${item.eventSessionId}`}
-                          className="text-primary hover:underline"
-                        >
-                          {sessionName}
-                        </Link>
-                      )}
-                      {item.assetId && assetTitle && (
-                        <Link
-                          href={`/assets/${item.assetId}`}
-                          className="text-primary hover:underline"
-                        >
-                          {assetTitle}
-                        </Link>
-                      )}
-                      {!sessionName && !assetTitle && (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      {item.dayLabel || (item.occurrenceDate ? new Date(item.occurrenceDate).toLocaleDateString() : "—")}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.playlistRole ? (
-                        <Badge variant="outline" className="text-xs">
-                          {item.playlistRole}
-                        </Badge>
-                      ) : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center py-12 border rounded-lg bg-muted/10">
-            <p className="text-muted-foreground">No items in this collection</p>
-            {evt && (
-              <p className="text-sm text-muted-foreground mt-2">
-                Use the pipeline to generate items from event sessions
-              </p>
-            )}
-          </div>
+        <ReorderableCollectionItems
+          collectionId={params.id}
+          items={items.map(({ item, sessionName, assetTitle }) => ({
+            id: item.id,
+            sequence: item.sequence,
+            label: item.label,
+            dayLabel: item.dayLabel,
+            playlistRole: item.playlistRole,
+            isContinuation: item.isContinuation,
+            eventSessionId: item.eventSessionId,
+            sessionName: sessionName,
+            assetId: item.assetId,
+            assetTitle: assetTitle,
+          }))}
+        />
+
+        {items.length === 0 && evt && (
+          <p className="text-sm text-muted-foreground mt-4 text-center">
+            Use the pipeline to generate items from event sessions
+          </p>
         )}
       </div>
 

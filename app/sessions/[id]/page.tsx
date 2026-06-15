@@ -8,6 +8,7 @@ import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteSession } from "@/lib/actions";
 import { SortableAssetTable } from "@/components/sortable-asset-table";
+import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,9 @@ export default async function SessionDetailPage({
     .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
     .where(eq(eventSessionAsset.eventSessionId, params.id))
     .orderBy(asc(asset.title), asc(asset.name));
+
+  // Canonical is determined by the session's canonicalEventSessionAssetId FK
+  const canonicalAssetId = session.canonicalEventSessionAssetId;
 
   // Get topics for this session
   const sessionTopicsList = await db
@@ -260,6 +264,7 @@ export default async function SessionDetailPage({
                   catalogingStatus: link.asset.catalogingStatus,
                   variantType: link.variantType,
                   variantLabel: link.variantLabel,
+                  isCanonical: link.linkId === canonicalAssetId,
                 }))}
                 showVariantColumn
                 tableId="assets"
@@ -301,6 +306,23 @@ export default async function SessionDetailPage({
               </div>
             </dl>
           </div>
+
+          {/* Canonical Asset Selector */}
+          {sessionAssetLinks.length > 0 && (
+            <div className="rounded-lg border p-6">
+              <CanonicalAssetSelector
+                sessionId={params.id}
+                assets={sessionAssetLinks.map((link) => ({
+                  linkId: link.linkId,
+                  assetId: link.asset.id,
+                  assetName: link.asset.title || link.asset.name,
+                  variantType: link.variantType,
+                  variantLabel: link.variantLabel,
+                }))}
+                currentCanonicalId={canonicalAssetId}
+              />
+            </div>
+          )}
 
           {/* Notes */}
           {session.notes && (
