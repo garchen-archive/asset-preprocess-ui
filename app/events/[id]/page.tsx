@@ -12,6 +12,7 @@ import { BulkAddSessionsButton } from "@/components/bulk-add-sessions-modal";
 import { SessionSequenceEditor, SessionRowActions } from "@/components/session-sequence-editor";
 import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { GenerateCollectionButton } from "@/components/generate-collection-button";
+import { EventBulkSync } from "@/components/event-bulk-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -535,6 +536,11 @@ export default async function EventDetailPage({
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Sessions ({eventSessions.length})</h2>
               <div className="flex gap-2">
+                <EventBulkSync
+                  eventId={params.id}
+                  eventName={event.eventName}
+                  sessionCount={eventSessions.length}
+                />
                 <BulkAddSessionsButton
                   eventId={params.id}
                   eventName={event.eventName}
