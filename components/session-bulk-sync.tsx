@@ -216,12 +216,14 @@ export function SessionBulkSync({
   }
 
   const unsyncedCount = preview?.assets.filter((a) => !a.is_synced).length || 0;
-  const eligibleTranscripts = preview?.transcripts.filter((t) => t.can_sync && !t.is_synced).length || 0;
+  const syncableTranscripts = preview?.transcripts.filter((t) => t.can_sync) || [];
+  const unsyncedTranscripts = syncableTranscripts.filter((t) => !t.is_synced).length;
+  const syncedTranscripts = syncableTranscripts.filter((t) => t.is_synced).length;
 
   return (
     <>
       <Button variant="outline" size="sm" onClick={handleOpen}>
-        Sync to Mux
+        Sync Session to Mux
       </Button>
 
       {/* Modal overlay */}
@@ -416,9 +418,12 @@ export function SessionBulkSync({
                         onChange={(e) => setIncludeSynced(e.target.checked)}
                         className="h-4 w-4 rounded border-gray-300"
                       />
-                      <span className="text-sm">Include already synced (force re-sync)</span>
+                      <div className="text-sm">
+                        <span>Force re-sync already synced items</span>
+                        <p className="text-xs text-muted-foreground">Re-upload videos and transcripts even if already on Mux</p>
+                      </div>
                     </label>
-                    {eligibleTranscripts > 0 && (
+                    {syncableTranscripts.length > 0 && (
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -426,7 +431,14 @@ export function SessionBulkSync({
                           onChange={(e) => setSyncTranscripts(e.target.checked)}
                           className="h-4 w-4 rounded border-gray-300"
                         />
-                        <span className="text-sm">Also sync approved transcripts ({eligibleTranscripts} ready)</span>
+                        <div className="text-sm">
+                          <span>Also sync transcripts</span>
+                          <p className="text-xs text-muted-foreground">
+                            {unsyncedTranscripts > 0 && `${unsyncedTranscripts} ready to sync`}
+                            {unsyncedTranscripts > 0 && syncedTranscripts > 0 && ", "}
+                            {syncedTranscripts > 0 && `${syncedTranscripts} already synced`}
+                          </p>
+                        </div>
                       </label>
                     )}
                   </div>
