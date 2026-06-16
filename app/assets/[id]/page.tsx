@@ -1013,7 +1013,11 @@ export default async function AssetDetailPage({
           <p className="text-sm text-muted-foreground mb-4">
             Deleting this asset will permanently remove it from the database. This action cannot be undone.
           </p>
-          <DeleteAssetButton id={params.id} />
+          <DeleteAssetButton
+            id={params.id}
+            assetType={data.assetType || undefined}
+            hasLinkedTranscripts={asCanonicalTranscripts.length > 0}
+          />
         </div>
       </div>
     </div>
