@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DeleteTranscriptButton } from "@/components/delete-transcript-button";
 import { BackblazeLink } from "@/components/backblaze-link";
+import { SubtitleViewer } from "@/components/subtitle-viewer";
 import { getVariantLabel } from "@/lib/variant-types";
 
 export const dynamic = "force-dynamic";
@@ -53,15 +54,33 @@ export default async function TranscriptDetailPage({
 
   const { transcript, mediaAsset } = result;
 
-  // Fetch canonical asset if exists
-  let canonicalAsset = null;
+  // Fetch canonical asset if exists (with fields needed for file viewing)
+  let canonicalAsset: {
+    id: string;
+    name: string | null;
+    title: string | null;
+    assetType: string | null;
+    fileFormat: string | null;
+    filepath: string | null;
+    metadataSource: string | null;
+    gdriveUrl: string | null;
+  } | null = null;
   if (transcript.canonicalAssetId) {
     const [asset] = await db
-      .select()
+      .select({
+        id: archiveAssets.id,
+        name: archiveAssets.name,
+        title: archiveAssets.title,
+        assetType: archiveAssets.assetType,
+        fileFormat: archiveAssets.fileFormat,
+        filepath: archiveAssets.filepath,
+        metadataSource: archiveAssets.metadataSource,
+        gdriveUrl: archiveAssets.gdriveUrl,
+      })
       .from(archiveAssets)
       .where(eq(archiveAssets.id, transcript.canonicalAssetId))
       .limit(1);
-    canonicalAsset = asset;
+    canonicalAsset = asset || null;
   }
 
   // Fetch linked event session if exists
@@ -236,6 +255,17 @@ export default async function TranscriptDetailPage({
             </div>
           )}
 
+          {/* Subtitle Content Preview */}
+          {canonicalAsset && (canonicalAsset.fileFormat === "srt" || canonicalAsset.fileFormat === "vtt") && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-xl font-semibold mb-4">Subtitle Content</h2>
+              <SubtitleViewer
+                assetId={canonicalAsset.id}
+                format={canonicalAsset.fileFormat}
+              />
+            </div>
+          )}
+
           {/* Revision History */}
           <div className="rounded-lg border p-6">
             <h2 className="text-xl font-semibold mb-4">Revision History</h2>
@@ -312,9 +342,55 @@ export default async function TranscriptDetailPage({
                     {canonicalAsset.fileFormat || "—"}
                   </dd>
                 </div>
-                {canonicalAsset.filepath && (
+                <div>
+                  <dt className="text-xs font-medium text-muted-foreground">Storage</dt>
+                  <dd className="mt-0.5">
+                    {canonicalAsset.metadataSource ? (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        canonicalAsset.metadataSource === 'backblaze' || canonicalAsset.metadataSource === 'pipeline'
+                          ? 'bg-orange-100 text-orange-700'
+                          : canonicalAsset.metadataSource === 'gdrive'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {canonicalAsset.metadataSource === 'backblaze' || canonicalAsset.metadataSource === 'pipeline'
+                          ? 'Backblaze B2'
+                          : canonicalAsset.metadataSource === 'gdrive'
+                          ? 'Google Drive'
+                          : canonicalAsset.metadataSource}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </dd>
+                </div>
+                {/* File viewing links based on storage provider */}
+                {canonicalAsset.gdriveUrl && canonicalAsset.gdriveUrl.includes('drive.google.com') && (
                   <div className="pt-2">
-                    <BackblazeLink fileKey={canonicalAsset.filepath} label="View SRT File" />
+                    <a
+                      href={canonicalAsset.gdriveUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.6 66.85l14.5-25.1-14.5-25.1h29L50 41.75l-14.5 25.1z" fill="#0066da"/>
+                        <path d="M21.1 16.65L35.6 41.75l14.5-25.1h-29z" fill="#00ac47"/>
+                        <path d="M50.1 16.65l14.5 25.1 14.5-25.1h-29z" fill="#ea4335"/>
+                        <path d="M64.6 41.75L50.1 16.65l-14.5 25.1 14.5 25.1z" fill="#00832d"/>
+                        <path d="M79.1 66.85l-14.5-25.1 14.5-25.1v50.2z" fill="#2684fc"/>
+                        <path d="M64.6 41.75l14.5 25.1H35.6l14.5-25.1z" fill="#ffba00"/>
+                      </svg>
+                      View {canonicalAsset.fileFormat?.toUpperCase() || 'Subtitle'} in Google Drive
+                    </a>
+                  </div>
+                )}
+                {(canonicalAsset.metadataSource === 'backblaze' || canonicalAsset.metadataSource === 'pipeline') && canonicalAsset.filepath && (
+                  <div className="pt-2">
+                    <BackblazeLink
+                      fileKey={canonicalAsset.filepath}
+                      label={`View ${canonicalAsset.fileFormat?.toUpperCase() || 'Subtitle'} File`}
+                    />
                   </div>
                 )}
               </div>

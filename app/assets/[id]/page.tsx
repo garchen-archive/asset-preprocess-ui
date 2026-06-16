@@ -7,8 +7,10 @@ import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { DeleteAssetButton } from "@/components/delete-asset-button";
 import { BackblazeLink } from "@/components/backblaze-link";
+import { SubtitleViewer } from "@/components/subtitle-viewer";
 import { MuxVideoPlayer } from "@/components/mux-video-player";
 import { getVariantLabel } from "@/lib/variant-types";
+import { AssetMuxIntegration } from "@/components/asset-mux-integration";
 
 export const dynamic = "force-dynamic";
 
@@ -159,102 +161,55 @@ export default async function AssetDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Main details */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Video Platform Section - Show if Mux is configured */}
-          {data.mediaProvider === "mux" && data.mediaProviderAssetId && (
-            <div className="rounded-lg border p-6">
-              <h2 className="text-xl font-semibold mb-4">Video Platform</h2>
+          {/* Mux Integration Section - Show for video/audio assets */}
+          {(data.assetType === "video" || data.assetType === "audio") && (() => {
+            const mediaProviderData = data.additionalMetadata?.media_provider as {
+              playback_id?: string;
+              duration?: number;
+              aspect_ratio?: string;
+              status?: string;
+            } | undefined;
 
-              {/* Video Player */}
-              {(() => {
-                const mediaProviderData = data.additionalMetadata?.media_provider as {
-                  playback_id?: string;
-                  duration?: number;
-                  aspect_ratio?: string;
-                  status?: string;
-                } | undefined;
+            const playbackId = mediaProviderData?.playback_id;
+            const isReady = mediaProviderData?.status === "ready";
 
-                const playbackId = mediaProviderData?.playback_id;
-
-                if (playbackId) {
-                  return (
-                    <div className="mb-4">
+            return (
+              <AssetMuxIntegration
+                assetId={params.id}
+                assetType={data.assetType}
+                mediaProvider={data.mediaProvider}
+                mediaProviderAssetId={data.mediaProviderAssetId}
+                playbackId={playbackId}
+                status={mediaProviderData?.status}
+                duration={mediaProviderData?.duration}
+                aspectRatio={mediaProviderData?.aspect_ratio}
+                transcripts={linkedTranscripts.map(tr => ({
+                  id: tr.id,
+                  language: tr.language,
+                  kind: tr.kind,
+                  spokenSource: tr.spokenSource,
+                  publicationStatus: tr.publicationStatus,
+                  stage: tr.stage,
+                  timecodeStatus: tr.timecodeStatus,
+                  source: tr.source,
+                  version: tr.version,
+                  subtitleTrackId: tr.subtitleTrackId,
+                  syncedAt: tr.syncedAt?.toISOString(),
+                }))}
+                showVideoPlayer={!!playbackId && isReady}
+                videoPlayerComponent={
+                  playbackId && isReady ? (
+                    <div className="rounded-lg border p-4">
                       <MuxVideoPlayer
                         playbackId={playbackId}
                         title={data.title || data.name || undefined}
                       />
                     </div>
-                  );
+                  ) : null
                 }
-                return null;
-              })()}
-
-              {/* Platform Info */}
-              <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Provider</dt>
-                  <dd className="text-sm mt-1">
-                    <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-pink-100 text-pink-700 capitalize">
-                      {data.mediaProvider}
-                    </span>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-muted-foreground">Asset ID</dt>
-                  <dd className="text-sm mt-1 font-mono text-xs">{data.mediaProviderAssetId}</dd>
-                </div>
-
-                {(() => {
-                  const mediaProviderData = data.additionalMetadata?.media_provider as {
-                    playback_id?: string;
-                    duration?: number;
-                    aspect_ratio?: string;
-                    status?: string;
-                  } | undefined;
-
-                  return (
-                    <>
-                      {mediaProviderData?.playback_id && (
-                        <div>
-                          <dt className="text-sm font-medium text-muted-foreground">Playback ID</dt>
-                          <dd className="text-sm mt-1 font-mono text-xs">{mediaProviderData.playback_id}</dd>
-                        </div>
-                      )}
-                      {mediaProviderData?.status && (
-                        <div>
-                          <dt className="text-sm font-medium text-muted-foreground">Status</dt>
-                          <dd className="text-sm mt-1">
-                            <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                              mediaProviderData.status === "ready"
-                                ? "bg-green-100 text-green-700"
-                                : mediaProviderData.status === "preparing"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-gray-100 text-gray-700"
-                            }`}>
-                              {mediaProviderData.status}
-                            </span>
-                          </dd>
-                        </div>
-                      )}
-                      {mediaProviderData?.duration && (
-                        <div>
-                          <dt className="text-sm font-medium text-muted-foreground">Duration</dt>
-                          <dd className="text-sm mt-1">
-                            {Math.floor(mediaProviderData.duration / 60)}:{String(Math.floor(mediaProviderData.duration % 60)).padStart(2, '0')}
-                          </dd>
-                        </div>
-                      )}
-                      {mediaProviderData?.aspect_ratio && (
-                        <div>
-                          <dt className="text-sm font-medium text-muted-foreground">Aspect Ratio</dt>
-                          <dd className="text-sm mt-1">{mediaProviderData.aspect_ratio}</dd>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-              </dl>
-            </div>
-          )}
+              />
+            );
+          })()}
 
           {/* Identity Section */}
           <div className="rounded-lg border p-6">
@@ -418,89 +373,84 @@ export default async function AssetDetailPage({
             </dl>
           </div>
 
-          {/* Linked Transcript Records */}
-          <div className="rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Transcript Records</h2>
-              <div className="flex gap-2">
-                {(data.assetType === "video" || data.assetType === "audio") && (
-                  <Button size="sm" variant="outline" asChild>
-                    <Link href={`/transcripts/new?mediaAssetId=${params.id}`}>
-                      Add Transcript
-                    </Link>
-                  </Button>
-                )}
-                {(data.assetType === "subtitle" || data.assetType === "document" ||
-                  ["srt", "vtt", "txt", "doc", "docx", "pdf"].includes(data.fileFormat || "")) && (
-                  <Button size="sm" variant="outline" asChild>
-                    <Link href={`/transcripts/new?canonicalAssetId=${params.id}`}>
-                      Use as Transcript File
-                    </Link>
-                  </Button>
-                )}
+          {/* Linked Transcript Records - Show for non-video/audio assets only (video/audio use the integrated component above) */}
+          {data.assetType !== "video" && data.assetType !== "audio" && (
+            <div className="rounded-lg border p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold">Transcript Records</h2>
+                <div className="flex gap-2">
+                  {(data.assetType === "subtitle" || data.assetType === "document" ||
+                    ["srt", "vtt", "txt", "doc", "docx", "pdf"].includes(data.fileFormat || "")) && (
+                    <Button size="sm" variant="outline" asChild>
+                      <Link href={`/transcripts/new?canonicalAssetId=${params.id}`}>
+                        Use as Transcript File
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-            {linkedTranscripts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No transcript records linked to this asset.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {linkedTranscripts.map((tr) => (
-                  <div
-                    key={tr.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <Link
-                          href={`/transcripts/${tr.id}`}
-                          className="text-sm font-medium text-blue-600 hover:underline"
-                        >
-                          {tr.language.toUpperCase()} {tr.kind}
-                          {tr.spokenSource && tr.spokenSource !== "primary" && tr.spokenSource !== "mixed" && (
-                            <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
-                          )}
-                        </Link>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                              tr.publicationStatus === "published"
-                                ? "bg-purple-100 text-purple-700"
-                                : tr.publicationStatus === "approved"
-                                ? "bg-green-100 text-green-700"
-                                : tr.publicationStatus === "in_review"
-                                ? "bg-blue-100 text-blue-700"
-                                : tr.publicationStatus === "needs_work"
-                                ? "bg-orange-100 text-orange-700"
-                                : tr.publicationStatus === "archived"
-                                ? "bg-slate-100 text-slate-700"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
+              {linkedTranscripts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No transcript records linked to this asset.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {linkedTranscripts.map((tr) => (
+                    <div
+                      key={tr.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <Link
+                            href={`/transcripts/${tr.id}`}
+                            className="text-sm font-medium text-blue-600 hover:underline"
                           >
-                            {tr.publicationStatus}
-                          </span>
-                          {tr.timecodeStatus && tr.timecodeStatus !== "none" && (
-                            <span className="text-xs text-muted-foreground">
-                              Timecode: {tr.timecodeStatus}
+                            {tr.language.toUpperCase()} {tr.kind}
+                            {tr.spokenSource && tr.spokenSource !== "primary" && tr.spokenSource !== "mixed" && (
+                              <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
+                            )}
+                          </Link>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                tr.publicationStatus === "published"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : tr.publicationStatus === "approved"
+                                  ? "bg-green-100 text-green-700"
+                                  : tr.publicationStatus === "in_review"
+                                  ? "bg-blue-100 text-blue-700"
+                                  : tr.publicationStatus === "needs_work"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : tr.publicationStatus === "archived"
+                                  ? "bg-slate-100 text-slate-700"
+                                  : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {tr.publicationStatus}
                             </span>
-                          )}
-                          {tr.source && (
-                            <span className="text-xs text-muted-foreground capitalize">
-                              ({tr.source})
-                            </span>
-                          )}
+                            {tr.timecodeStatus && tr.timecodeStatus !== "none" && (
+                              <span className="text-xs text-muted-foreground">
+                                Timecode: {tr.timecodeStatus}
+                              </span>
+                            )}
+                            {tr.source && (
+                              <span className="text-xs text-muted-foreground capitalize">
+                                ({tr.source})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <div className="text-xs text-muted-foreground">
+                        v{tr.version}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      v{tr.version}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Transcripts using this asset as canonical file */}
           {asCanonicalTranscripts.length > 0 && (
@@ -556,6 +506,17 @@ export default async function AssetDetailPage({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Subtitle Content Preview - for SRT/VTT files */}
+          {(data.fileFormat === "srt" || data.fileFormat === "vtt") && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-xl font-semibold mb-4">Subtitle Content</h2>
+              <SubtitleViewer
+                assetId={data.id}
+                format={data.fileFormat}
+              />
             </div>
           )}
 

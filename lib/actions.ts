@@ -2004,6 +2004,11 @@ export async function importOrganizationsFromCSV(rows: CSVRow[]) {
 // ============================================================================
 
 export async function createTranscript(formData: FormData): Promise<{ error: string } | undefined> {
+  // Get current user from session for editedBy field
+  const session = await getServerSession(authOptions);
+  const currentUserId = session?.user ? (session.user as any).id : null;
+  const currentUserName = session?.user?.name || "system";
+
   const data = {
     mediaAssetId: (formData.get("mediaAssetId") as string) || null,
     canonicalAssetId: (formData.get("canonicalAssetId") as string) || null,
@@ -2017,24 +2022,39 @@ export async function createTranscript(formData: FormData): Promise<{ error: str
     timecodeStatus: (formData.get("timecodeStatus") as string) || "none",
     source: (formData.get("source") as string) || null,
     publicationStatus: (formData.get("publicationStatus") as string) || "draft",
-    createdBy: (formData.get("createdBy") as string) || null,
+    stage: (formData.get("stage") as string) || "editor_review",
+    createdBy: (formData.get("createdBy") as string) || currentUserId,
     notes: (formData.get("notes") as string) || null,
   };
+
+  // editedBy for revision - use provided value, current user ID, or username as fallback
+  const editedBy = (formData.get("createdBy") as string) || currentUserId || currentUserName;
 
   try {
     const [newTranscript] = await db.insert(transcripts).values(data).returning();
 
-    // Create initial revision
+    // Create initial revision (v1)
     await db.insert(transcriptRevisions).values({
       transcriptId: newTranscript.id,
       canonicalAssetId: data.canonicalAssetId,
       versionNumber: 1,
-      editedBy: data.createdBy,
+      editedBy: editedBy,
       changeNote: "Initial creation",
       statusSnapshot: data.publicationStatus,
     });
 
     revalidatePath("/transcripts");
+
+    // Check if we should skip redirect (for quick add from other pages)
+    const skipRedirect = formData.get("skipRedirect") === "true";
+    if (skipRedirect) {
+      // Also revalidate sessions path for session page quick add
+      if (data.eventSessionId) {
+        revalidatePath(`/sessions/${data.eventSessionId}`);
+      }
+      return; // Success, no redirect
+    }
+
     redirect(`/transcripts/${newTranscript.id}`);
   } catch (error: any) {
     // Re-throw redirect errors (these are not actual errors)
@@ -2111,6 +2131,31 @@ export async function deleteTranscript(id: string) {
 
   revalidatePath("/transcripts");
   redirect("/transcripts");
+}
+
+// Link an existing transcript to a session
+export async function linkTranscriptToSession({
+  transcriptId,
+  sessionId,
+}: {
+  transcriptId: string;
+  sessionId: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await db
+      .update(transcripts)
+      .set({
+        eventSessionId: sessionId,
+        updatedAt: new Date(),
+      })
+      .where(eq(transcripts.id, transcriptId));
+
+    revalidatePath(`/sessions/${sessionId}`);
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to link transcript to session:", error);
+    return { success: false, error: "Failed to link transcript" };
+  }
 }
 
 // Bulk update transcripts

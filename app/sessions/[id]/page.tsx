@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset } from "@/lib/db/schema";
+import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts } from "@/lib/db/schema";
 import { eq, asc, and, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { notFound } from "next/navigation";
 import { deleteSession } from "@/lib/actions";
 import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
+import { SessionTranscriptList } from "@/components/session-transcript-list";
+import { SessionBulkSync } from "@/components/session-bulk-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +80,77 @@ export default async function SessionDetailPage({
     .from(sessionCategories)
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
     .where(eq(sessionCategories.eventSessionId, params.id));
+
+  // Get transcripts for this session (with media asset info for sync target display)
+  const sessionTranscripts = await db
+    .select({
+      id: transcripts.id,
+      language: transcripts.language,
+      kind: transcripts.kind,
+      spokenSource: transcripts.spokenSource,
+      publicationStatus: transcripts.publicationStatus,
+      stage: transcripts.stage,
+      mediaAssetId: transcripts.mediaAssetId,
+      subtitleTrackId: transcripts.subtitleTrackId,
+      syncedAt: transcripts.syncedAt,
+    })
+    .from(transcripts)
+    .where(
+      and(
+        eq(transcripts.eventSessionId, params.id),
+        isNull(transcripts.deletedAt)
+      )
+    );
+
+  // Get media asset names for transcripts that have explicit media_asset_id
+  const transcriptsWithAssetNames = await Promise.all(
+    sessionTranscripts.map(async (tr) => {
+      if (tr.mediaAssetId) {
+        const [mediaAsset] = await db
+          .select({ name: asset.name, title: asset.title })
+          .from(asset)
+          .where(eq(asset.id, tr.mediaAssetId))
+          .limit(1);
+        return {
+          ...tr,
+          mediaAssetName: mediaAsset?.title || mediaAsset?.name || null,
+        };
+      }
+      return { ...tr, mediaAssetName: null };
+    })
+  );
+
+  // Get the actual asset ID from the canonical link (eventSessionAsset -> asset)
+  const canonicalLink = sessionAssetLinks.find(link => link.linkId === canonicalAssetId);
+  const canonicalMediaAssetId = canonicalLink?.asset.id;
+
+  // Get transcripts on canonical asset that are NOT already linked to this session
+  // These can be offered to link to the session
+  const canonicalAssetTranscripts = canonicalMediaAssetId
+    ? await db
+        .select({
+          id: transcripts.id,
+          language: transcripts.language,
+          kind: transcripts.kind,
+          spokenSource: transcripts.spokenSource,
+          publicationStatus: transcripts.publicationStatus,
+          stage: transcripts.stage,
+          eventSessionId: transcripts.eventSessionId,
+          subtitleTrackId: transcripts.subtitleTrackId,
+        })
+        .from(transcripts)
+        .where(
+          and(
+            eq(transcripts.mediaAssetId, canonicalMediaAssetId),
+            isNull(transcripts.deletedAt)
+          )
+        )
+    : [];
+
+  // Filter to only those NOT already linked to this session
+  const linkableTranscripts = canonicalAssetTranscripts.filter(
+    tr => tr.eventSessionId !== params.id
+  );
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -252,6 +325,11 @@ export default async function SessionDetailPage({
           <div className="rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Assets ({sessionAssetLinks.length})</h2>
+              <SessionBulkSync
+                sessionId={params.id}
+                sessionName={session.sessionName}
+                hasAssets={sessionAssetLinks.length > 0}
+              />
             </div>
             {sessionAssetLinks.length > 0 ? (
               <SortableAssetTable
@@ -273,6 +351,31 @@ export default async function SessionDetailPage({
               <p className="text-sm text-muted-foreground">No assets linked to this session yet.</p>
             )}
           </div>
+
+          {/* Transcripts for this Session */}
+          <SessionTranscriptList
+            sessionId={params.id}
+            transcripts={transcriptsWithAssetNames.map(tr => ({
+              ...tr,
+              syncedAt: tr.syncedAt?.toISOString() || null,
+            }))}
+            sessionAssets={sessionAssetLinks.map((link) => ({
+              linkId: link.linkId,
+              assetId: link.asset.id,
+              assetName: link.asset.title || link.asset.name,
+              variantType: link.variantType,
+              variantLabel: link.variantLabel,
+            }))}
+            canonicalAssetLinkId={canonicalAssetId}
+            linkableTranscripts={linkableTranscripts.map(tr => ({
+              id: tr.id,
+              language: tr.language,
+              kind: tr.kind,
+              spokenSource: tr.spokenSource,
+              stage: tr.stage,
+              isSynced: !!tr.subtitleTrackId,
+            }))}
+          />
         </div>
 
         <div className="space-y-6">

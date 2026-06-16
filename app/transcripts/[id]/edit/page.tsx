@@ -4,6 +4,8 @@ import { eq, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,10 @@ export default async function EditTranscriptPage({
 }: {
   params: { id: string };
 }) {
+  // Get current user for auto-populating editedBy field
+  const session = await getServerSession(authOptions);
+  const currentUserName = session?.user?.name || "";
+
   // Fetch the transcript
   const [transcript] = await db
     .select()
@@ -110,6 +116,7 @@ export default async function EditTranscriptPage({
         initialMediaAsset={initialMediaAsset}
         initialCanonicalAsset={initialCanonicalAsset}
         cancelHref={`/transcripts/${params.id}`}
+        defaultUserName={currentUserName}
       />
     </div>
   );

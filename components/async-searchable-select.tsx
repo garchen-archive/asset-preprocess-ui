@@ -10,7 +10,7 @@ interface OptionItem {
 interface AsyncSearchableSelectProps {
   searchEndpoint: string; // API endpoint to search
   value?: string;
-  onChange?: (value: string) => void;
+  onChange?: (value: string, label?: string) => void;
   name?: string;
   placeholder?: string;
   disabled?: boolean;
@@ -105,7 +105,7 @@ export function AsyncSearchableSelect({
   const handleSelect = (val: string, label?: string) => {
     setSelectedValue(val);
     setSelectedLabel(label || "");
-    onChange?.(val);
+    onChange?.(val, label);
     setSearch("");
     setIsOpen(false);
     setOptions([]);
