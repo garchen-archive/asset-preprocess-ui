@@ -108,6 +108,8 @@ interface TranscriptFormProps {
   defaultMediaAssetId?: string;
   defaultCanonicalAssetId?: string;
   cancelHref: string;
+  // Auto-populate createdBy/editedBy with current user
+  defaultUserName?: string;
 }
 
 export function TranscriptForm({
@@ -120,6 +122,7 @@ export function TranscriptForm({
   defaultMediaAssetId,
   defaultCanonicalAssetId,
   cancelHref,
+  defaultUserName = "",
 }: TranscriptFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,8 +150,8 @@ export function TranscriptForm({
   const [timecodeStatus, setTimecodeStatus] = useState(transcript?.timecodeStatus || "none");
   const [source, setSource] = useState(transcript?.source || "");
   const [publicationStatus, setPublicationStatus] = useState(transcript?.publicationStatus || "draft");
-  const [editedBy, setEditedBy] = useState(transcript?.editedBy || "");
-  const [createdBy, setCreatedBy] = useState(transcript?.createdBy || "");
+  const [editedBy, setEditedBy] = useState(transcript?.editedBy || defaultUserName);
+  const [createdBy, setCreatedBy] = useState(transcript?.createdBy || defaultUserName);
   const [notes, setNotes] = useState(transcript?.notes || "");
   const [changeNote, setChangeNote] = useState("");
 

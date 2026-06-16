@@ -73,42 +73,80 @@ export default async function TranscriptsPage({
   };
 
   const orderBy = sortOrder === "asc" ? asc(getSortColumn()) : desc(getSortColumn());
+  const whereClause = conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined;
 
-  // Fetch transcripts with media asset info
-  const transcriptsList = await db
-    .select({
-      transcript: transcripts,
-      mediaAsset: {
-        id: archiveAssets.id,
-        name: archiveAssets.name,
-        title: archiveAssets.title,
-        assetType: archiveAssets.assetType,
-        duration: archiveAssets.duration,
-      },
-    })
-    .from(transcripts)
-    .leftJoin(archiveAssets, eq(transcripts.mediaAssetId, archiveAssets.id))
-    .where(conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined)
-    .orderBy(orderBy)
-    .limit(ITEMS_PER_PAGE)
-    .offset(offset);
-
-  // Get total count
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(transcripts)
-    .where(conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined);
-
-  const totalPages = Math.ceil(count / ITEMS_PER_PAGE);
-
-  // Get distinct values for filters
-  const [languagesResult, kindsResult, statusesResult, timecodesResult, sourcesResult] = await Promise.all([
+  // Run all independent queries in parallel for better performance
+  const [
+    transcriptsList,
+    countResult,
+    languagesResult,
+    kindsResult,
+    statusesResult,
+    timecodesResult,
+    sourcesResult,
+  ] = await Promise.all([
+    // Main query: transcripts with media asset info
+    db
+      .select({
+        transcript: transcripts,
+        mediaAsset: {
+          id: archiveAssets.id,
+          name: archiveAssets.name,
+          title: archiveAssets.title,
+          assetType: archiveAssets.assetType,
+          duration: archiveAssets.duration,
+        },
+      })
+      .from(transcripts)
+      .leftJoin(archiveAssets, eq(transcripts.mediaAssetId, archiveAssets.id))
+      .where(whereClause)
+      .orderBy(orderBy)
+      .limit(ITEMS_PER_PAGE)
+      .offset(offset),
+    // Count query
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(transcripts)
+      .where(whereClause),
+    // Filter options (these run in parallel too)
     db.selectDistinct({ value: transcripts.language }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.kind }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.publicationStatus }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.timecodeStatus }).from(transcripts).where(isNull(transcripts.deletedAt)),
     db.selectDistinct({ value: transcripts.source }).from(transcripts).where(isNull(transcripts.deletedAt)),
   ]);
+
+  const count = countResult[0].count;
+  const totalPages = Math.ceil(count / ITEMS_PER_PAGE);
+
+  // Fetch canonical asset storage info in a second query (efficient IN query, only if needed)
+  const canonicalAssetIds = transcriptsList
+    .map(t => t.transcript.canonicalAssetId)
+    .filter((id): id is string => id !== null);
+
+  const canonicalAssetsMap = new Map<string, { metadataSource: string | null; fileFormat: string | null }>();
+  if (canonicalAssetIds.length > 0) {
+    const canonicalAssets = await db
+      .select({
+        id: archiveAssets.id,
+        metadataSource: archiveAssets.metadataSource,
+        fileFormat: archiveAssets.fileFormat,
+      })
+      .from(archiveAssets)
+      .where(sql`${archiveAssets.id} IN ${canonicalAssetIds}`);
+
+    for (const ca of canonicalAssets) {
+      canonicalAssetsMap.set(ca.id, { metadataSource: ca.metadataSource, fileFormat: ca.fileFormat });
+    }
+  }
+
+  // Merge canonical asset info into the result
+  const transcriptsWithCanonical = transcriptsList.map(t => ({
+    ...t,
+    canonicalAsset: t.transcript.canonicalAssetId
+      ? canonicalAssetsMap.get(t.transcript.canonicalAssetId) || null
+      : null,
+  }));
 
   const languages = languagesResult.map((r) => r.value).filter((v): v is string => Boolean(v)).sort();
   const kinds = kindsResult.map((r) => r.value).filter((v): v is string => Boolean(v)).sort();
@@ -133,7 +171,7 @@ export default async function TranscriptsPage({
 
       {/* Client component for filters, table, and bulk actions */}
       <TranscriptsPageClient
-        transcripts={transcriptsList}
+        transcripts={transcriptsWithCanonical}
         totalCount={count}
         currentPage={page}
         totalPages={totalPages}

@@ -3,6 +3,8 @@ import { archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib
 import { eq, isNull } from "drizzle-orm";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,9 @@ export default async function NewTranscriptPage({
 }: {
   searchParams: { mediaAssetId?: string; canonicalAssetId?: string };
 }) {
+  // Get current user for auto-populating createdBy field
+  const session = await getServerSession(authOptions);
+  const currentUserName = session?.user?.name || "";
   // Fetch initial assets if IDs are provided (for pre-selection)
   let initialMediaAsset = null;
   let initialCanonicalAsset = null;
@@ -98,6 +103,7 @@ export default async function NewTranscriptPage({
         defaultMediaAssetId={searchParams.mediaAssetId}
         defaultCanonicalAssetId={searchParams.canonicalAssetId}
         cancelHref="/transcripts"
+        defaultUserName={currentUserName}
       />
     </div>
   );

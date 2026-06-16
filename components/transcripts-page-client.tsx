@@ -34,6 +34,10 @@ type TranscriptWithAsset = {
     assetType: string | null;
     duration: string | null;
   } | null;
+  canonicalAsset: {
+    metadataSource: string | null;
+    fileFormat: string | null;
+  } | null;
 };
 
 type TranscriptsPageClientProps = {
@@ -325,19 +329,21 @@ export function TranscriptsPageClient({
               <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Timecode</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Source</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Storage</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Version</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Updated</th>
+              <th className="w-20 px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {transcripts.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground">
                   No transcripts found
                 </td>
               </tr>
             ) : (
-              transcripts.map(({ transcript, mediaAsset }) => (
+              transcripts.map(({ transcript, mediaAsset, canonicalAsset }) => (
                 <tr key={transcript.id} className="hover:bg-muted/30">
                   <td className="px-4 py-3">
                     <input
@@ -348,12 +354,16 @@ export function TranscriptsPageClient({
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/transcripts/${transcript.id}`}
-                      className="text-sm font-medium text-blue-600 hover:underline"
-                    >
-                      {mediaAsset?.title || mediaAsset?.name || "Unknown Asset"}
-                    </Link>
+                    {mediaAsset ? (
+                      <Link
+                        href={`/assets/${mediaAsset.id}`}
+                        className="text-sm font-medium text-blue-600 hover:underline"
+                      >
+                        {mediaAsset.title || mediaAsset.name || "Unknown Asset"}
+                      </Link>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">No media asset</span>
+                    )}
                     {mediaAsset?.assetType && (
                       <span className="ml-2 text-xs text-muted-foreground">
                         ({mediaAsset.assetType})
@@ -382,9 +392,39 @@ export function TranscriptsPageClient({
                   <td className="px-4 py-3 text-sm capitalize">
                     {transcript.source || "—"}
                   </td>
+                  <td className="px-4 py-3">
+                    {canonicalAsset?.metadataSource ? (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        canonicalAsset.metadataSource === 'backblaze' || canonicalAsset.metadataSource === 'pipeline'
+                          ? 'bg-orange-100 text-orange-700'
+                          : canonicalAsset.metadataSource === 'gdrive'
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        {canonicalAsset.metadataSource === 'backblaze' || canonicalAsset.metadataSource === 'pipeline'
+                          ? 'B2'
+                          : canonicalAsset.metadataSource === 'gdrive'
+                          ? 'GDrive'
+                          : canonicalAsset.metadataSource}
+                        {canonicalAsset.fileFormat && (
+                          <span className="ml-1 opacity-70">.{canonicalAsset.fileFormat}</span>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm">v{transcript.version}</td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">
                     {new Date(transcript.updatedAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/transcripts/${transcript.id}`}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      View
+                    </Link>
                   </td>
                 </tr>
               ))
