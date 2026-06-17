@@ -72,3 +72,11 @@ services:
       - key: PIPELINE_API_KEY
         scope: RUN_TIME
         value: ${PIPELINE_API_KEY}
+
+      # Mux Dashboard Links
+      - key: MUX_ORG_ID
+        scope: RUN_TIME
+        value: i6quli
+      - key: MUX_ENV_ID
+        scope: RUN_TIME
+        value: g09e5p

@@ -28,6 +28,7 @@ interface AssetMuxIntegrationProps {
   status?: string | null;
   duration?: number | null;
   aspectRatio?: string | null;
+  muxDashboardUrl?: string | null;
   transcripts: TranscriptData[];
   showVideoPlayer?: boolean;
   videoPlayerComponent?: React.ReactNode;
@@ -42,6 +43,7 @@ export function AssetMuxIntegration({
   status,
   duration,
   aspectRatio,
+  muxDashboardUrl,
   transcripts,
   showVideoPlayer = false,
   videoPlayerComponent,
@@ -69,6 +71,7 @@ export function AssetMuxIntegration({
         status={status}
         duration={duration}
         aspectRatio={aspectRatio}
+        muxDashboardUrl={muxDashboardUrl}
         onSyncComplete={handleSyncComplete}
       />
 

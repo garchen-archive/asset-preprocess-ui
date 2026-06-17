@@ -11,6 +11,7 @@ import { SubtitleViewer } from "@/components/subtitle-viewer";
 import { MuxVideoPlayer } from "@/components/mux-video-player";
 import { getVariantLabel } from "@/lib/variant-types";
 import { AssetMuxIntegration } from "@/components/asset-mux-integration";
+import { getMuxDashboardUrl } from "@/lib/mux";
 
 export const dynamic = "force-dynamic";
 
@@ -204,6 +205,7 @@ export default async function AssetDetailPage({
                 status={mediaProviderData?.status}
                 duration={mediaProviderData?.duration}
                 aspectRatio={mediaProviderData?.aspect_ratio}
+                muxDashboardUrl={data.mediaProviderAssetId ? getMuxDashboardUrl(data.mediaProviderAssetId) : null}
                 transcripts={linkedTranscripts.map(tr => ({
                   id: tr.id,
                   language: tr.language,
