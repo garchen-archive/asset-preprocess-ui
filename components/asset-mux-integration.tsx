@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { MuxSyncWidget } from "./mux-sync-widget";
-import { TranscriptListWithSync } from "./transcript-list-with-sync";
+import { TranscriptList } from "./transcript-list";
 
 interface TranscriptData {
   id: string;
@@ -16,6 +16,7 @@ interface TranscriptData {
   version: number;
   subtitleTrackId?: string | null;
   syncedAt?: string | null;
+  canonicalAssetName?: string | null;
 }
 
 interface AssetMuxIntegrationProps {
@@ -72,12 +73,13 @@ export function AssetMuxIntegration({
       />
 
       {/* Transcripts with Sync */}
-      <TranscriptListWithSync
-        assetId={assetId}
+      <TranscriptList
+        scope="asset"
+        mediaAssetId={assetId}
         assetType={assetType}
         transcripts={transcripts}
         isMuxSynced={isMuxSynced}
-        onSyncComplete={handleSyncComplete}
+        onRefresh={handleSyncComplete}
       />
     </div>
   );

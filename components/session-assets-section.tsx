@@ -19,9 +19,9 @@ const VARIANT_TYPES = [
 interface AssetLink {
   id: string;
   title: string | null;
-  name: string;
-  assetType: string;
-  duration: number | null;
+  name: string | null;
+  assetType: string | null;
+  duration: string | null;
   catalogingStatus: string | null;
   variantType: string;
   variantLabel: string | null;

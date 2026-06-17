@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { archiveAssets, sessions, events, transcripts, eventSessionAsset } from "@/lib/db/schema";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, isNull, and, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
@@ -51,16 +51,33 @@ export default async function AssetDetailPage({
   // Use direct event if available, otherwise use event from session
   const event = directEvent || sessionEvent;
 
-  // Fetch transcripts linked to this asset as media asset
-  const linkedTranscripts = await db
-    .select()
+  // Fetch transcripts linked to this asset as media asset (with canonical asset info via join)
+  // Use aliased table to avoid conflict with main archiveAssets reference
+  const canonicalAsset = aliasedTable(archiveAssets, "canonical_asset");
+  const linkedTranscriptsRaw = await db
+    .select({
+      transcript: transcripts,
+      canonicalName: canonicalAsset.name,
+      canonicalTitle: canonicalAsset.title,
+      canonicalFormat: canonicalAsset.fileFormat,
+    })
     .from(transcripts)
+    .leftJoin(canonicalAsset, eq(transcripts.canonicalAssetId, canonicalAsset.id))
     .where(
       and(
         isNull(transcripts.deletedAt),
         eq(transcripts.mediaAssetId, params.id)
       )
     );
+
+  // Flatten and add canonicalAssetName
+  const linkedTranscripts = linkedTranscriptsRaw.map((row) => {
+    const baseName = row.canonicalTitle || row.canonicalName || null;
+    const canonicalAssetName = baseName && row.canonicalFormat
+      ? `${baseName} (${row.canonicalFormat})`
+      : baseName;
+    return { ...row.transcript, canonicalAssetName };
+  });
 
   // Fetch transcripts where this asset is the canonical (transcript file)
   const asCanonicalTranscripts = await db
@@ -199,6 +216,7 @@ export default async function AssetDetailPage({
                   version: tr.version,
                   subtitleTrackId: tr.subtitleTrackId,
                   syncedAt: tr.syncedAt?.toISOString(),
+                  canonicalAssetName: tr.canonicalAssetName,
                 }))}
                 showVideoPlayer={!!playbackId && isReady}
                 videoPlayerComponent={
@@ -415,6 +433,11 @@ export default async function AssetDetailPage({
                               <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
                             )}
                           </Link>
+                          {tr.canonicalAssetName && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {tr.canonicalAssetName}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 mt-1">
                             <span
                               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
