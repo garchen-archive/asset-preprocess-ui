@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { transcripts, archiveAssets, sessions, events, eventSessionAsset, asset } from "@/lib/db/schema";
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { TranscriptForm } from "@/components/transcript-form";
@@ -88,6 +88,7 @@ export default async function EditTranscriptPage({
     })
     .from(eventSessionAsset)
     .leftJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+    .where(isNull(eventSessionAsset.deletedAt))
     .limit(2000);
 
   return (

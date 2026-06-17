@@ -74,6 +74,7 @@ export default async function AssetDetailPage({
     );
 
   // Fetch session links via event_session_asset (the canonical source for session-asset relationships)
+  // Filter out soft-deleted links
   const sessionLinks = await db
     .select({
       linkId: eventSessionAsset.id,
@@ -86,7 +87,10 @@ export default async function AssetDetailPage({
     .from(eventSessionAsset)
     .innerJoin(sessions, eq(eventSessionAsset.eventSessionId, sessions.id))
     .leftJoin(events, eq(sessions.eventId, events.id))
-    .where(eq(eventSessionAsset.assetId, params.id));
+    .where(and(
+      eq(eventSessionAsset.assetId, params.id),
+      isNull(eventSessionAsset.deletedAt)
+    ));
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [

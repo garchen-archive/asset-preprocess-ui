@@ -75,6 +75,7 @@ export default async function NewTranscriptPage({
     })
     .from(eventSessionAsset)
     .leftJoin(asset, eq(eventSessionAsset.assetId, asset.id))
+    .where(isNull(eventSessionAsset.deletedAt))
     .limit(2000);
 
   return (

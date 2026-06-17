@@ -93,7 +93,10 @@ export default async function EventDetailPage({
         })
         .from(eventSessionAsset)
         .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
-        .where(inArray(eventSessionAsset.eventSessionId, sessionIds))
+        .where(and(
+          inArray(eventSessionAsset.eventSessionId, sessionIds),
+          isNull(eventSessionAsset.deletedAt)
+        ))
         .orderBy(asc(asset.title), asc(asset.name))
     : [];
 

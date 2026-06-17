@@ -55,7 +55,10 @@ export default async function SessionDetailPage({
     })
     .from(eventSessionAsset)
     .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
-    .where(eq(eventSessionAsset.eventSessionId, params.id))
+    .where(and(
+      eq(eventSessionAsset.eventSessionId, params.id),
+      isNull(eventSessionAsset.deletedAt)
+    ))
     .orderBy(asc(asset.title), asc(asset.name));
 
   // Canonical is determined by the session's canonicalEventSessionAssetId FK
