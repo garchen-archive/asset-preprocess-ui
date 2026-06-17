@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { AsyncSearchableSelect } from "@/components/async-searchable-select";
 import { createTranscript, linkTranscriptToSession } from "@/lib/actions";
 
 const LANGUAGE_OPTIONS = [
@@ -330,9 +329,9 @@ export function SessionTranscriptList({
             sessionId={sessionId}
             sessionAssets={sessionAssets}
             canonicalAsset={canonicalAsset}
-            existingLanguages={[
-              ...transcripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`),
-              ...linkableTranscripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`),
+            existingCombinations={[
+              ...transcripts.map(t => `${t.mediaAssetId || ""}-${t.language}-${t.kind}-${t.spokenSource}`),
+              ...linkableTranscripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`), // linkable don't have mediaAssetId context
             ]}
             onSuccess={() => {
               setShowQuickAdd(false);
@@ -499,12 +498,12 @@ function SessionTranscriptQuickAdd({
   sessionId,
   sessionAssets,
   canonicalAsset,
-  existingLanguages = [],
+  existingCombinations = [],
   onSuccess,
   onCancel,
 }: {
   sessionId: string;
-  existingLanguages?: string[];
+  existingCombinations?: string[];
   sessionAssets: SessionAsset[];
   canonicalAsset?: SessionAsset;
   onSuccess: () => void;
@@ -518,12 +517,124 @@ function SessionTranscriptQuickAdd({
   const [createdCount, setCreatedCount] = useState(0);
   const { toast } = useToast();
 
+  // Multi-select search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Array<{ id: string; label: string }>>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSearching, setIsSearching] = useState(false);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
   // Get current target asset name
   const currentTargetAsset = sessionAssets.find(a => a.assetId === currentMediaAssetId);
 
-  // Add a new row when an SRT/VTT file is selected - captures current target asset
+  // Search for transcript files
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (searchQuery.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const response = await fetch(`/api/search/assets?type=transcript&q=${encodeURIComponent(searchQuery)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSearchResults(data.map((item: any) => ({
+            id: item.id,
+            label: `${item.title || item.name} (${item.fileFormat || item.assetType})`,
+          })));
+        }
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Toggle selection of a search result
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Add all selected files to rows
+  const addSelectedFiles = () => {
+    const existingIds = new Set(rows.map(r => r.canonicalAssetId));
+    let addedCount = 0;
+
+    selectedIds.forEach(id => {
+      if (existingIds.has(id)) return; // Skip duplicates
+
+      const result = searchResults.find(r => r.id === id);
+      if (!result) return;
+
+      const newRow: TranscriptRow = {
+        id: crypto.randomUUID(),
+        canonicalAssetId: result.id,
+        canonicalAssetName: result.label,
+        mediaAssetId: currentMediaAssetId,
+        mediaAssetName: currentTargetAsset?.assetName || "No target",
+        language: guessLanguageFromFilename(result.label),
+        kind: guessKindFromFilename(result.label),
+        spokenSource: "teacher",
+        stage: "approved",
+      };
+      setRows(prev => [...prev, newRow]);
+      addedCount++;
+    });
+
+    if (addedCount > 0) {
+      toast({
+        title: `${addedCount} file${addedCount > 1 ? "s" : ""} added`,
+        description: "Review and adjust settings below, then create transcripts.",
+      });
+    }
+
+    // Clear selection but keep search results visible
+    setSelectedIds(new Set());
+  };
+
+  // Guess language from filename (e.g., "_bo", "_en", "_zh")
+  const guessLanguageFromFilename = (filename: string): string => {
+    const lower = filename.toLowerCase();
+    if (lower.includes("_bo") || lower.includes("-bo") || lower.includes("tibetan")) return "bo";
+    if (lower.includes("_zh") || lower.includes("-zh") || lower.includes("chinese")) return "zh";
+    if (lower.includes("_es") || lower.includes("-es") || lower.includes("spanish")) return "es";
+    if (lower.includes("_de") || lower.includes("-de") || lower.includes("german")) return "de";
+    if (lower.includes("_vi") || lower.includes("-vi") || lower.includes("vietnam")) return "vi";
+    if (lower.includes("_fr") || lower.includes("-fr") || lower.includes("french")) return "fr";
+    if (lower.includes("_pt") || lower.includes("-pt") || lower.includes("portug")) return "pt";
+    return "en"; // Default to English
+  };
+
+  // Guess kind from filename
+  const guessKindFromFilename = (filename: string): string => {
+    const lower = filename.toLowerCase();
+    if (lower.includes("translat")) return "translation";
+    return "transcript";
+  };
+
+  // Add a single row (kept for compatibility)
   const addRow = (assetId: string, assetName: string) => {
-    // Prevent duplicate files
     if (rows.some(r => r.canonicalAssetId === assetId)) {
       toast({
         title: "File already added",
@@ -539,8 +650,8 @@ function SessionTranscriptQuickAdd({
       canonicalAssetName: assetName,
       mediaAssetId: currentMediaAssetId,
       mediaAssetName: currentTargetAsset?.assetName || "No target",
-      language: "en",
-      kind: "transcript",
+      language: guessLanguageFromFilename(assetName),
+      kind: guessKindFromFilename(assetName),
       spokenSource: "teacher",
       stage: "approved",
     };
@@ -559,9 +670,10 @@ function SessionTranscriptQuickAdd({
     setRows(prev => prev.filter(row => row.id !== id));
   };
 
-  // Check if a row would create a duplicate
+  // Check if a row would create a duplicate (same target asset + language + kind + spokenSource)
   const isDuplicate = (row: TranscriptRow) => {
-    return existingLanguages.includes(`${row.language}-${row.kind}-${row.spokenSource}`);
+    const key = `${row.mediaAssetId || ""}-${row.language}-${row.kind}-${row.spokenSource}`;
+    return existingCombinations.includes(key);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -627,7 +739,7 @@ function SessionTranscriptQuickAdd({
       )}
 
       <div className="space-y-4">
-        {/* Target Asset + Add File in one row */}
+        {/* Target Asset + Search in one row */}
         <div className="flex gap-3 items-end">
           <div className="w-1/3">
             <Label className="text-xs">Target Asset</Label>
@@ -646,22 +758,67 @@ function SessionTranscriptQuickAdd({
             </select>
           </div>
           <div className="flex-1">
-            <Label className="text-xs">Add SRT/VTT File</Label>
-            <AsyncSearchableSelect
-              searchEndpoint="/api/search/assets?type=transcript"
-              value=""
-              onChange={(value, label) => {
-                if (value && label) {
-                  addRow(value, label);
-                }
-              }}
-              placeholder="Search for SRT/VTT file..."
-              name="addFile"
-              emptyLabel=""
-              minChars={2}
+            <Label className="text-xs">Search SRT/VTT Files</Label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Type to search (select multiple)..."
+              className="flex h-9 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
             />
           </div>
+          {selectedIds.size > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={addSelectedFiles}
+              className="h-9"
+            >
+              Add {selectedIds.size} Selected
+            </Button>
+          )}
         </div>
+
+        {/* Search Results with checkboxes */}
+        {(searchResults.length > 0 || isSearching) && (
+          <div className="border rounded-lg max-h-48 overflow-y-auto bg-white">
+            {isSearching ? (
+              <div className="p-3 text-sm text-muted-foreground">Searching...</div>
+            ) : (
+              <div className="divide-y">
+                {searchResults.map((result) => {
+                  const isSelected = selectedIds.has(result.id);
+                  const isAlreadyAdded = rows.some(r => r.canonicalAssetId === result.id);
+
+                  return (
+                    <label
+                      key={result.id}
+                      className={`flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-muted/50 ${
+                        isAlreadyAdded ? "opacity-50" : ""
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => !isAlreadyAdded && toggleSelection(result.id)}
+                        disabled={isAlreadyAdded}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      <span className="text-sm flex-1">{result.label}</span>
+                      {isAlreadyAdded && (
+                        <span className="text-xs text-muted-foreground">Added</span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {searchQuery.length > 0 && searchQuery.length < 2 && (
+          <p className="text-xs text-muted-foreground">Type at least 2 characters to search</p>
+        )}
 
         {/* List of files to create transcripts for */}
         {rows.length > 0 && (
