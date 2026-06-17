@@ -7,10 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteSession } from "@/lib/actions";
-import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 import { SessionTranscriptList } from "@/components/session-transcript-list";
-import { SessionBulkSync } from "@/components/session-bulk-sync";
+import { SessionAssetsSection } from "@/components/session-assets-section";
 
 export const dynamic = "force-dynamic";
 
@@ -325,35 +324,21 @@ export default async function SessionDetailPage({
           )}
 
           {/* Assets in this Session */}
-          <div className="rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Assets ({sessionAssetLinks.length})</h2>
-              <SessionBulkSync
-                sessionId={params.id}
-                sessionName={session.sessionName}
-                hasAssets={sessionAssetLinks.length > 0}
-              />
-            </div>
-            {sessionAssetLinks.length > 0 ? (
-              <SortableAssetTable
-                assets={sessionAssetLinks.map((link) => ({
-                  id: link.asset.id,
-                  title: link.asset.title,
-                  name: link.asset.name,
-                  assetType: link.asset.assetType,
-                  duration: link.asset.duration,
-                  catalogingStatus: link.asset.catalogingStatus,
-                  variantType: link.variantType,
-                  variantLabel: link.variantLabel,
-                  isCanonical: link.linkId === canonicalAssetId,
-                }))}
-                showVariantColumn
-                tableId="assets"
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">No assets linked to this session yet.</p>
-            )}
-          </div>
+          <SessionAssetsSection
+            sessionId={params.id}
+            sessionName={session.sessionName}
+            assets={sessionAssetLinks.map((link) => ({
+              id: link.asset.id,
+              title: link.asset.title,
+              name: link.asset.name,
+              assetType: link.asset.assetType,
+              duration: link.asset.duration,
+              catalogingStatus: link.asset.catalogingStatus,
+              variantType: link.variantType,
+              variantLabel: link.variantLabel,
+              isCanonical: link.linkId === canonicalAssetId,
+            }))}
+          />
 
           {/* Transcripts for this Session */}
           <SessionTranscriptList
