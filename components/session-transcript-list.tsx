@@ -262,15 +262,13 @@ export function SessionTranscriptList({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">Transcripts ({transcripts.length})</h2>
         <div className="flex gap-2">
-          {!showQuickAdd && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowQuickAdd(true)}
-            >
-              + Quick Add
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowQuickAdd(!showQuickAdd)}
+          >
+            {showQuickAdd ? "Cancel" : "Quick Add"}
+          </Button>
           <Button size="sm" variant="ghost" asChild>
             <Link href={`/transcripts/new?eventSessionId=${sessionId}`}>
               Full Form
@@ -278,6 +276,72 @@ export function SessionTranscriptList({
           </Button>
         </div>
       </div>
+
+      {/* Quick Add Form - appears below header when open */}
+      {showQuickAdd && (
+        <div className="border rounded-lg p-4 bg-muted/30 mb-4">
+          {/* Existing transcripts on canonical asset that can be linked */}
+          {linkableTranscripts.length > 0 && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+              <h4 className="text-sm font-semibold text-blue-800 mb-2">
+                Existing Transcripts on Canonical Asset
+              </h4>
+              <p className="text-xs text-blue-700 mb-3">
+                These transcripts are already linked to the canonical asset. Link them to this session instead of creating duplicates.
+              </p>
+              <div className="space-y-2">
+                {linkableTranscripts.map((tr) => (
+                  <div
+                    key={tr.id}
+                    className="flex items-center justify-between p-2 bg-white rounded border"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">
+                        {tr.language.toUpperCase()} {tr.kind}
+                        {tr.spokenSource && tr.spokenSource !== "primary" && (
+                          <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
+                        )}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {tr.stage}
+                      </Badge>
+                      {tr.isSynced && (
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                          Synced
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleLinkTranscript(tr.id)}
+                      disabled={linkingIds.has(tr.id)}
+                    >
+                      {linkingIds.has(tr.id) ? "Linking..." : "Link to Session"}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Create New section */}
+          <SessionTranscriptQuickAdd
+            sessionId={sessionId}
+            sessionAssets={sessionAssets}
+            canonicalAsset={canonicalAsset}
+            existingLanguages={[
+              ...transcripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`),
+              ...linkableTranscripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`),
+            ]}
+            onSuccess={() => {
+              setShowQuickAdd(false);
+              router.refresh();
+            }}
+            onCancel={() => setShowQuickAdd(false)}
+          />
+        </div>
+      )}
 
       {/* Warning if no canonical asset */}
       {!canonicalAsset && sessionAssets.length > 0 && (
@@ -291,7 +355,7 @@ export function SessionTranscriptList({
 
       {transcripts.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No transcripts linked to this session.
+          No transcripts linked to this session. Click "Quick Add" to create one.
         </p>
       ) : (
         <div className="space-y-3">
@@ -411,72 +475,6 @@ export function SessionTranscriptList({
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Linkable Transcripts & Quick Add Form */}
-      {showQuickAdd && (
-        <div className="border-t pt-4 mt-4 space-y-4">
-          {/* Existing transcripts on canonical asset that can be linked */}
-          {linkableTranscripts.length > 0 && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 className="text-sm font-semibold text-blue-800 mb-2">
-                Existing Transcripts on Canonical Asset
-              </h4>
-              <p className="text-xs text-blue-700 mb-3">
-                These transcripts are already linked to the canonical asset. Link them to this session instead of creating duplicates.
-              </p>
-              <div className="space-y-2">
-                {linkableTranscripts.map((tr) => (
-                  <div
-                    key={tr.id}
-                    className="flex items-center justify-between p-2 bg-white rounded border"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {tr.language.toUpperCase()} {tr.kind}
-                        {tr.spokenSource && tr.spokenSource !== "primary" && (
-                          <span className="text-muted-foreground font-normal"> ({tr.spokenSource})</span>
-                        )}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {tr.stage}
-                      </Badge>
-                      {tr.isSynced && (
-                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
-                          Synced
-                        </Badge>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleLinkTranscript(tr.id)}
-                      disabled={linkingIds.has(tr.id)}
-                    >
-                      {linkingIds.has(tr.id) ? "Linking..." : "Link to Session"}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Create New section */}
-          <SessionTranscriptQuickAdd
-            sessionId={sessionId}
-            sessionAssets={sessionAssets}
-            canonicalAsset={canonicalAsset}
-            existingLanguages={[
-              ...transcripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`),
-              ...linkableTranscripts.map(t => `${t.language}-${t.kind}-${t.spokenSource}`),
-            ]}
-            onSuccess={() => {
-              setShowQuickAdd(false);
-              router.refresh();
-            }}
-            onCancel={() => setShowQuickAdd(false)}
-          />
         </div>
       )}
     </div>
