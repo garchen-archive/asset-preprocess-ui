@@ -222,20 +222,21 @@ export async function updateAsset(id: string, formData: FormData) {
 
       if (assetLinksResponse.ok) {
         const assetLinks = await assetLinksResponse.json();
-        const sessionIds = assetLinks.sessions?.map((s: any) => s.event_session_id) || [];
+        // Use link IDs (not session IDs) for deletion
+        const linkIds = assetLinks.sessions?.map((s: any) => s.id) || [];
 
-        // Delete each link
+        // Delete each link by its ID
         await Promise.allSettled(
-          sessionIds.map(async (sessionId: string) => {
+          linkIds.map(async (linkId: string) => {
             const deleteResponse = await fetch(
-              `${PIPELINE_API_URL}/api/v1/admin/sessions/${sessionId}/assets/${id}`,
+              `${PIPELINE_API_URL}/api/v1/admin/session-assets/${linkId}`,
               {
                 method: "DELETE",
                 headers: { "X-API-Key": PIPELINE_API_KEY },
               }
             );
             if (!deleteResponse.ok) {
-              console.warn(`Failed to delete EventSessionAsset link for session ${sessionId}`);
+              console.warn(`Failed to delete EventSessionAsset link ${linkId}`);
             }
           })
         );

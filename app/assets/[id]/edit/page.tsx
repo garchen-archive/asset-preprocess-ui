@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { archiveAssets, sessions, events, eventSessionAsset } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, isNull } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -45,12 +45,16 @@ export default async function AssetEditPage({
 
   // Fetch the EventSessionAsset link for this asset (the canonical way to link assets to sessions)
   // This takes precedence over the deprecated eventSessionId column
+  // Filter out soft-deleted links
   const sessionLinks = await db
     .select({
       eventSessionId: eventSessionAsset.eventSessionId,
     })
     .from(eventSessionAsset)
-    .where(eq(eventSessionAsset.assetId, params.id))
+    .where(and(
+      eq(eventSessionAsset.assetId, params.id),
+      isNull(eventSessionAsset.deletedAt)
+    ))
     .limit(1);
 
   // Use EventSessionAsset link if exists, otherwise fall back to deprecated eventSessionId column

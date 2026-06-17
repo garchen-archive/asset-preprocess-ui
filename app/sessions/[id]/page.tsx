@@ -1,16 +1,15 @@
 import { db } from "@/lib/db/client";
 import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts } from "@/lib/db/schema";
-import { eq, asc, and, isNull } from "drizzle-orm";
+import { eq, asc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
 import { deleteSession } from "@/lib/actions";
-import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
-import { SessionTranscriptList } from "@/components/session-transcript-list";
-import { SessionBulkSync } from "@/components/session-bulk-sync";
+import { TranscriptList } from "@/components/transcript-list";
+import { SessionAssetsSection } from "@/components/session-assets-section";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +54,10 @@ export default async function SessionDetailPage({
     })
     .from(eventSessionAsset)
     .innerJoin(asset, eq(eventSessionAsset.assetId, asset.id))
-    .where(eq(eventSessionAsset.eventSessionId, params.id))
+    .where(and(
+      eq(eventSessionAsset.eventSessionId, params.id),
+      isNull(eventSessionAsset.deletedAt)
+    ))
     .orderBy(asc(asset.title), asc(asset.name));
 
   // Canonical is determined by the session's canonicalEventSessionAssetId FK
@@ -81,8 +83,11 @@ export default async function SessionDetailPage({
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
     .where(eq(sessionCategories.eventSessionId, params.id));
 
-  // Get transcripts for this session (with media asset info for sync target display)
-  const sessionTranscripts = await db
+  // Get transcripts for this session with media and canonical asset info via JOINs
+  const mediaAsset = aliasedTable(asset, "media_asset");
+  const canonicalAsset = aliasedTable(asset, "canonical_asset");
+
+  const sessionTranscriptsRaw = await db
     .select({
       id: transcripts.id,
       language: transcripts.language,
@@ -91,10 +96,20 @@ export default async function SessionDetailPage({
       publicationStatus: transcripts.publicationStatus,
       stage: transcripts.stage,
       mediaAssetId: transcripts.mediaAssetId,
+      canonicalAssetId: transcripts.canonicalAssetId,
       subtitleTrackId: transcripts.subtitleTrackId,
       syncedAt: transcripts.syncedAt,
+      // Media asset info
+      mediaName: mediaAsset.name,
+      mediaTitle: mediaAsset.title,
+      // Canonical asset info
+      canonicalName: canonicalAsset.name,
+      canonicalTitle: canonicalAsset.title,
+      canonicalFormat: canonicalAsset.fileFormat,
     })
     .from(transcripts)
+    .leftJoin(mediaAsset, eq(transcripts.mediaAssetId, mediaAsset.id))
+    .leftJoin(canonicalAsset, eq(transcripts.canonicalAssetId, canonicalAsset.id))
     .where(
       and(
         eq(transcripts.eventSessionId, params.id),
@@ -102,23 +117,29 @@ export default async function SessionDetailPage({
       )
     );
 
-  // Get media asset names for transcripts that have explicit media_asset_id
-  const transcriptsWithAssetNames = await Promise.all(
-    sessionTranscripts.map(async (tr) => {
-      if (tr.mediaAssetId) {
-        const [mediaAsset] = await db
-          .select({ name: asset.name, title: asset.title })
-          .from(asset)
-          .where(eq(asset.id, tr.mediaAssetId))
-          .limit(1);
-        return {
-          ...tr,
-          mediaAssetName: mediaAsset?.title || mediaAsset?.name || null,
-        };
-      }
-      return { ...tr, mediaAssetName: null };
-    })
-  );
+  // Flatten and compute display names
+  const transcriptsWithAssetNames = sessionTranscriptsRaw.map((tr) => {
+    const mediaAssetName = tr.mediaTitle || tr.mediaName || null;
+    const canonicalBaseName = tr.canonicalTitle || tr.canonicalName || null;
+    const canonicalAssetName = canonicalBaseName && tr.canonicalFormat
+      ? `${canonicalBaseName} (${tr.canonicalFormat})`
+      : canonicalBaseName;
+
+    return {
+      id: tr.id,
+      language: tr.language,
+      kind: tr.kind,
+      spokenSource: tr.spokenSource,
+      publicationStatus: tr.publicationStatus,
+      stage: tr.stage,
+      mediaAssetId: tr.mediaAssetId,
+      canonicalAssetId: tr.canonicalAssetId,
+      subtitleTrackId: tr.subtitleTrackId,
+      syncedAt: tr.syncedAt,
+      mediaAssetName,
+      canonicalAssetName,
+    };
+  });
 
   // Get the actual asset ID from the canonical link (eventSessionAsset -> asset)
   const canonicalLink = sessionAssetLinks.find(link => link.linkId === canonicalAssetId);
@@ -322,38 +343,25 @@ export default async function SessionDetailPage({
           )}
 
           {/* Assets in this Session */}
-          <div className="rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Assets ({sessionAssetLinks.length})</h2>
-              <SessionBulkSync
-                sessionId={params.id}
-                sessionName={session.sessionName}
-                hasAssets={sessionAssetLinks.length > 0}
-              />
-            </div>
-            {sessionAssetLinks.length > 0 ? (
-              <SortableAssetTable
-                assets={sessionAssetLinks.map((link) => ({
-                  id: link.asset.id,
-                  title: link.asset.title,
-                  name: link.asset.name,
-                  assetType: link.asset.assetType,
-                  duration: link.asset.duration,
-                  catalogingStatus: link.asset.catalogingStatus,
-                  variantType: link.variantType,
-                  variantLabel: link.variantLabel,
-                  isCanonical: link.linkId === canonicalAssetId,
-                }))}
-                showVariantColumn
-                tableId="assets"
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">No assets linked to this session yet.</p>
-            )}
-          </div>
+          <SessionAssetsSection
+            sessionId={params.id}
+            sessionName={session.sessionName}
+            assets={sessionAssetLinks.map((link) => ({
+              id: link.asset.id,
+              title: link.asset.title,
+              name: link.asset.name,
+              assetType: link.asset.assetType,
+              duration: link.asset.duration,
+              catalogingStatus: link.asset.catalogingStatus,
+              variantType: link.variantType,
+              variantLabel: link.variantLabel,
+              isCanonical: link.linkId === canonicalAssetId,
+            }))}
+          />
 
           {/* Transcripts for this Session */}
-          <SessionTranscriptList
+          <TranscriptList
+            scope="session"
             sessionId={params.id}
             transcripts={transcriptsWithAssetNames.map(tr => ({
               ...tr,
