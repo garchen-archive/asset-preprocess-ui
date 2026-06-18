@@ -19,9 +19,10 @@ const nextConfig = {
     },
   },
   env: {
-    NEXT_PUBLIC_APP_VERSION: packageJson.version,
-    NEXT_PUBLIC_GIT_COMMIT: getGitCommit(),
-    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+    // Prefer env vars (set by Docker build args) over defaults
+    NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION || packageJson.version,
+    NEXT_PUBLIC_GIT_COMMIT: process.env.NEXT_PUBLIC_GIT_COMMIT || getGitCommit(),
+    NEXT_PUBLIC_BUILD_TIME: process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString(),
   },
 }
 
