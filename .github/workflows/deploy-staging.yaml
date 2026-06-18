@@ -44,9 +44,14 @@ jobs:
       - name: Log in to DO Container Registry
         run: doctl registry login --expiry-seconds 3600
 
-      - name: Get short SHA
-        id: sha
-        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+      - name: Get version info
+        id: version
+        run: |
+          echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          # Get latest tag or use 'dev' if no tags
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+          echo "app_version=${VERSION#v}" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6.5.0
@@ -54,14 +59,18 @@ jobs:
           context: .
           push: true
           tags: |
-            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-${{ steps.sha.outputs.short }}
+            registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-${{ steps.version.outputs.short_sha }}
             registry.digitalocean.com/${{ secrets.DO_REGISTRY_NAME }}/garchen-archive:webui-staging
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.app_version }}
+            GIT_COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.version.outputs.build_time }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Update app spec with image tag
         run: |
-          sed -i 's/tag: webui-staging/tag: webui-${{ steps.sha.outputs.short }}/g' .do/app.staging.yaml
+          sed -i 's/tag: webui-staging/tag: webui-${{ steps.version.outputs.short_sha }}/g' .do/app.staging.yaml
 
       - name: Deploy to Staging
         uses: digitalocean/app_action/deploy@v2
@@ -82,5 +91,6 @@ jobs:
       - name: Summary
         run: |
           echo "### Staging Deployment" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image tag:** webui-${{ steps.sha.outputs.short }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ steps.version.outputs.app_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image tag:** webui-${{ steps.version.outputs.short_sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

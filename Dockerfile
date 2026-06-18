@@ -1,6 +1,11 @@
 # Build stage
 FROM node:20-alpine AS builder
 
+# Build args for version info
+ARG APP_VERSION=dev
+ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
+
 WORKDIR /app
 
 # Install dependencies
@@ -13,8 +18,12 @@ COPY . .
 # Ensure public directory exists (Next.js standalone expects it)
 RUN mkdir -p public
 
-# Build the application
+# Set version info as env vars for Next.js build
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_APP_VERSION=$APP_VERSION
+ENV NEXT_PUBLIC_GIT_COMMIT=$GIT_COMMIT
+ENV NEXT_PUBLIC_BUILD_TIME=$BUILD_TIME
+
 RUN npm run build
 
 # Runtime stage
