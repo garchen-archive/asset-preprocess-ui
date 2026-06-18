@@ -29,6 +29,8 @@ export interface TranscriptData {
   timecodeStatus?: string | null;
   source?: string | null;
   version?: number;
+  // Session scope: indicates transcript comes from canonical asset, not directly linked
+  viaCanonicalAsset?: boolean;
 }
 
 export interface LinkableTranscript {
@@ -593,6 +595,11 @@ export function TranscriptList({
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
                           {tr.canonicalAssetName}
                         </p>
+                      )}
+                      {tr.viaCanonicalAsset && (
+                        <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200 mt-1">
+                          via canonical asset
+                        </Badge>
                       )}
 
                       {/* Sync Target (session scope only) */}

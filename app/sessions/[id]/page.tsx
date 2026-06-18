@@ -145,9 +145,8 @@ export default async function SessionDetailPage({
   const canonicalLink = sessionAssetLinks.find(link => link.linkId === canonicalAssetId);
   const canonicalMediaAssetId = canonicalLink?.asset.id;
 
-  // Get transcripts on canonical asset that are NOT already linked to this session
-  // These can be offered to link to the session
-  const canonicalAssetTranscripts = canonicalMediaAssetId
+  // Get transcripts on canonical asset (with full info for display)
+  const canonicalAssetTranscriptsRaw = canonicalMediaAssetId
     ? await db
         .select({
           id: transcripts.id,
@@ -156,10 +155,18 @@ export default async function SessionDetailPage({
           spokenSource: transcripts.spokenSource,
           publicationStatus: transcripts.publicationStatus,
           stage: transcripts.stage,
+          mediaAssetId: transcripts.mediaAssetId,
+          canonicalAssetId: transcripts.canonicalAssetId,
           eventSessionId: transcripts.eventSessionId,
           subtitleTrackId: transcripts.subtitleTrackId,
+          syncedAt: transcripts.syncedAt,
+          // Canonical asset info (the VTT file)
+          canonicalName: canonicalAsset.name,
+          canonicalTitle: canonicalAsset.title,
+          canonicalFormat: canonicalAsset.fileFormat,
         })
         .from(transcripts)
+        .leftJoin(canonicalAsset, eq(transcripts.canonicalAssetId, canonicalAsset.id))
         .where(
           and(
             eq(transcripts.mediaAssetId, canonicalMediaAssetId),
@@ -168,8 +175,46 @@ export default async function SessionDetailPage({
         )
     : [];
 
-  // Filter to only those NOT already linked to this session
-  const linkableTranscripts = canonicalAssetTranscripts.filter(
+  // Get IDs of transcripts already linked to this session (to avoid duplicates)
+  const sessionLinkedIds = new Set(transcriptsWithAssetNames.map(t => t.id));
+
+  // Filter canonical asset transcripts to those NOT already in session list
+  const canonicalOnlyTranscripts = canonicalAssetTranscriptsRaw
+    .filter(tr => !sessionLinkedIds.has(tr.id))
+    .map(tr => {
+      const canonicalBaseName = tr.canonicalTitle || tr.canonicalName || null;
+      const canonicalAssetName = canonicalBaseName && tr.canonicalFormat
+        ? `${canonicalBaseName} (${tr.canonicalFormat})`
+        : canonicalBaseName;
+
+      // Get the media asset name from the canonical link
+      const mediaAssetName = canonicalLink?.asset.title || canonicalLink?.asset.name || null;
+
+      return {
+        id: tr.id,
+        language: tr.language,
+        kind: tr.kind,
+        spokenSource: tr.spokenSource,
+        publicationStatus: tr.publicationStatus,
+        stage: tr.stage,
+        mediaAssetId: tr.mediaAssetId,
+        canonicalAssetId: tr.canonicalAssetId,
+        subtitleTrackId: tr.subtitleTrackId,
+        syncedAt: tr.syncedAt,
+        mediaAssetName,
+        canonicalAssetName,
+        viaCanonicalAsset: true, // Flag to indicate this comes from canonical asset
+      };
+    });
+
+  // Combine session-linked and canonical asset transcripts
+  const allTranscripts = [
+    ...transcriptsWithAssetNames.map(tr => ({ ...tr, viaCanonicalAsset: false })),
+    ...canonicalOnlyTranscripts,
+  ];
+
+  // For Quick Add: transcripts on canonical asset not linked to this session
+  const linkableTranscripts = canonicalAssetTranscriptsRaw.filter(
     tr => tr.eventSessionId !== params.id
   );
 
@@ -363,7 +408,7 @@ export default async function SessionDetailPage({
           <TranscriptList
             scope="session"
             sessionId={params.id}
-            transcripts={transcriptsWithAssetNames.map(tr => ({
+            transcripts={allTranscripts.map(tr => ({
               ...tr,
               syncedAt: tr.syncedAt?.toISOString() || null,
             }))}
