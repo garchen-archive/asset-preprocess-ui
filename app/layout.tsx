@@ -4,6 +4,7 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/session-provider";
 import { UserMenu } from "@/components/user-menu";
 import { Toaster } from "@/components/ui/toaster";
+import { Footer } from "@/components/footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,7 +20,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={`${inter.className} min-h-screen flex flex-col`}>
         <SessionProvider>
           <nav className="border-b">
             <div className="container mx-auto px-4 py-4">
@@ -89,7 +90,8 @@ export default function RootLayout({
               </div>
             </div>
           </nav>
-          <main className="container mx-auto px-4 py-8">{children}</main>
+          <main className="container mx-auto px-4 py-8 flex-1">{children}</main>
+          <Footer />
           <Toaster />
         </SessionProvider>
       </body>
