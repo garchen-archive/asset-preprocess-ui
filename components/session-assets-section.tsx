@@ -182,7 +182,7 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
                 }}
                 transformResult={(item) => ({
                   value: item.id,
-                  label: `${item.title || item.name} (${item.assetType}${item.fileFormat ? ` - ${item.fileFormat}` : ""})`,
+                  label: `${item.title || item.name} (${item.assetType}${item.fileFormat ? ` - ${item.fileFormat}` : ""}) [${item.id.slice(0, 8)}]`,
                 })}
               />
             </div>
