@@ -256,6 +256,7 @@ export const eventSession = pgTable("event_session", {
   eventId: uuid("event_id").references(() => event.id, { onDelete: "cascade" }),
   canonicalEventSessionAssetId: uuid("canonical_event_session_asset_id"), // FK added after eventSessionAsset is defined
   sessionName: text("session_name").notNull(),
+  title: text("title"),
   sessionDate: date("session_date", { mode: "string" }),
   sessionTime: text("session_time"), // Time of day: morning, afternoon, evening, night
   sessionStartTime: time("session_start_time"),
@@ -778,6 +779,7 @@ export const relatedAsset = pgTable("related_asset", {
   sequence: integer("sequence"),
   metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export type RelatedAsset = typeof relatedAsset.$inferSelect;

@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
-import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem } from "@/lib/db/schema";
-import { eq, sql, inArray, asc, desc, and, isNull } from "drizzle-orm";
+import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset } from "@/lib/db/schema";
+import { eq, sql, inArray, asc, desc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import { SessionSequenceEditor, SessionRowActions } from "@/components/session-s
 import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { GenerateCollectionButton } from "@/components/generate-collection-button";
 import { EventBulkSync } from "@/components/event-bulk-sync";
+import { RelatedAssetsSection } from "@/components/related-assets-section";
 
 export const dynamic = "force-dynamic";
 
@@ -244,6 +245,31 @@ export default async function EventDetailPage({
     .orderBy(desc(collection.isDefault), asc(collection.name));
 
   const hasDefaultCollection = eventCollections.some((c) => c.collection.isDefault);
+
+  // Get related assets for this event
+  const relatedAssetAlias = aliasedTable(asset, "related_asset_file");
+  const eventRelatedAssets = await db
+    .select({
+      id: relatedAsset.id,
+      assetId: relatedAsset.assetId,
+      title: relatedAssetAlias.title,
+      name: relatedAssetAlias.name,
+      assetType: relatedAssetAlias.assetType,
+      relatedType: relatedAsset.relatedType,
+      label: relatedAsset.label,
+      sequence: relatedAsset.sequence,
+    })
+    .from(relatedAsset)
+    .innerJoin(relatedAssetAlias, eq(relatedAsset.assetId, relatedAssetAlias.id))
+    .where(
+      and(
+        eq(relatedAsset.ownerType, "event"),
+        eq(relatedAsset.ownerId, params.id),
+        isNull(relatedAsset.deletedAt),
+        isNull(relatedAssetAlias.deletedAt)
+      )
+    )
+    .orderBy(asc(relatedAsset.sequence));
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -741,6 +767,14 @@ export default async function EventDetailPage({
               <p className="text-sm text-muted-foreground">No session assets yet.</p>
             )}
           </div>
+
+          {/* Related Assets */}
+          <RelatedAssetsSection
+            ownerType="event"
+            ownerId={params.id}
+            ownerName={event.eventName}
+            assets={eventRelatedAssets}
+          />
         </div>
 
         {/* Right column - Sidebar */}
