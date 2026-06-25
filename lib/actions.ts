@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { dateCertaintyToMeta, type DateCertainty } from "@/lib/utils";
 import { DEFAULT_VARIANT_TYPE, DEFAULT_VARIANT_LABEL } from "@/lib/variant-types";
+import { fetchAssetContent } from "@/lib/storage/pipeline";
 
 function parseCoord(value: string | null): number | null {
   if (!value) return null;
@@ -556,6 +557,7 @@ export async function createSession(formData: FormData) {
       },
       body: JSON.stringify({
         session_name: formData.get("sessionName") as string,
+        title: formData.get("sessionName") as string,
         session_date: formData.get("sessionDate") as string || null,
         session_start_time: formData.get("sessionStartTime") as string || null,
         session_end_time: formData.get("sessionEndTime") as string || null,
@@ -628,6 +630,7 @@ export async function updateSession(id: string, formData: FormData) {
       },
       body: JSON.stringify({
         session_name: formData.get("sessionName") as string,
+        title: formData.get("sessionName") as string,
         session_date: formData.get("sessionDate") as string || null,
         session_start_time: formData.get("sessionStartTime") as string || null,
         session_end_time: formData.get("sessionEndTime") as string || null,
@@ -2044,6 +2047,31 @@ export async function createTranscript(formData: FormData): Promise<{ error: str
       statusSnapshot: data.publicationStatus,
     });
 
+    // If a canonical asset is provided, fetch and store the content
+    // Store in metadata.transcript_content so the admin app can read it
+    if (data.canonicalAssetId) {
+      try {
+        const contentResult = await fetchAssetContent(data.canonicalAssetId);
+        if (contentResult) {
+          await db.update(transcripts)
+            .set({
+              content: contentResult.content,
+              metadata: {
+                ...((newTranscript.metadata as Record<string, any>) || {}),
+                transcript_content: contentResult.content,
+                content_format: contentResult.format,
+                content_fetched_at: new Date().toISOString(),
+              },
+            })
+            .where(eq(transcripts.id, newTranscript.id));
+          console.log(`[createTranscript] Fetched and stored content for transcript ${newTranscript.id}`);
+        }
+      } catch (contentError) {
+        // Non-fatal: log but don't fail the creation
+        console.warn(`[createTranscript] Failed to fetch content for canonical asset ${data.canonicalAssetId}:`, contentError);
+      }
+    }
+
     revalidatePath("/transcripts");
 
     // Check if we should skip redirect (for quick add from other pages)
@@ -2119,6 +2147,33 @@ export async function updateTranscript(id: string, formData: FormData) {
     statusSnapshot: data.publicationStatus,
   });
 
+  // Fetch content if canonical asset changed OR if content is missing
+  // Store in metadata.transcript_content so the admin app can read it
+  const currentMetadata = (current.metadata as Record<string, any>) || {};
+  const contentMissing = !current.content && !currentMetadata.transcript_content;
+  if (data.canonicalAssetId && (data.canonicalAssetId !== current.canonicalAssetId || contentMissing)) {
+    try {
+      const contentResult = await fetchAssetContent(data.canonicalAssetId);
+      if (contentResult) {
+        await db.update(transcripts)
+          .set({
+            content: contentResult.content,
+            metadata: {
+              ...currentMetadata,
+              transcript_content: contentResult.content,
+              content_format: contentResult.format,
+              content_fetched_at: new Date().toISOString(),
+            },
+          })
+          .where(eq(transcripts.id, id));
+        console.log(`[updateTranscript] Fetched and stored content for transcript ${id}`);
+      }
+    } catch (contentError) {
+      // Non-fatal: log but don't fail the update
+      console.warn(`[updateTranscript] Failed to fetch content for canonical asset ${data.canonicalAssetId}:`, contentError);
+    }
+  }
+
   revalidatePath(`/transcripts/${id}`);
   redirect(`/transcripts/${id}`);
 }
@@ -2132,6 +2187,147 @@ export async function deleteTranscript(id: string) {
 
   revalidatePath("/transcripts");
   redirect("/transcripts");
+}
+
+// Refresh/fetch content for an existing transcript from its canonical asset
+export async function refreshTranscriptContent(id: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const [transcript] = await db
+      .select()
+      .from(transcripts)
+      .where(eq(transcripts.id, id))
+      .limit(1);
+
+    if (!transcript) {
+      return { success: false, error: "Transcript not found" };
+    }
+
+    if (!transcript.canonicalAssetId) {
+      return { success: false, error: "Transcript has no canonical asset" };
+    }
+
+    const contentResult = await fetchAssetContent(transcript.canonicalAssetId);
+    if (!contentResult) {
+      return { success: false, error: "Failed to fetch content from canonical asset" };
+    }
+
+    await db.update(transcripts)
+      .set({
+        content: contentResult.content,
+        metadata: {
+          ...((transcript.metadata as Record<string, any>) || {}),
+          transcript_content: contentResult.content,
+          content_format: contentResult.format,
+          content_fetched_at: new Date().toISOString(),
+        },
+        updatedAt: new Date(),
+      })
+      .where(eq(transcripts.id, id));
+
+    console.log(`[refreshTranscriptContent] Fetched and stored content for transcript ${id}`);
+    revalidatePath(`/transcripts/${id}`);
+    return { success: true };
+  } catch (error) {
+    console.error("[refreshTranscriptContent] Error:", error);
+    return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+  }
+}
+
+// Bulk refresh content for all transcripts with canonical assets but missing content
+export async function bulkRefreshTranscriptContent(options?: {
+  eventSessionId?: string;  // Optional: only refresh transcripts for a specific session
+  limit?: number;           // Optional: limit number of transcripts to process (default: 100)
+}): Promise<{ success: boolean; processed: number; updated: number; errors: string[] }> {
+  const limit = options?.limit ?? 100;
+  const errors: string[] = [];
+  let processed = 0;
+  let updated = 0;
+
+  try {
+    // Find transcripts with canonical asset but missing content
+    let query = db
+      .select({
+        id: transcripts.id,
+        canonicalAssetId: transcripts.canonicalAssetId,
+        content: transcripts.content,
+        metadata: transcripts.metadata,
+      })
+      .from(transcripts)
+      .where(
+        and(
+          sql`${transcripts.canonicalAssetId} IS NOT NULL`,
+          sql`${transcripts.deletedAt} IS NULL`,
+          sql`(${transcripts.content} IS NULL OR ${transcripts.content} = '' OR ${transcripts.metadata}->>'transcript_content' IS NULL)`
+        )
+      )
+      .limit(limit);
+
+    // Optionally filter by event session
+    if (options?.eventSessionId) {
+      query = db
+        .select({
+          id: transcripts.id,
+          canonicalAssetId: transcripts.canonicalAssetId,
+          content: transcripts.content,
+          metadata: transcripts.metadata,
+        })
+        .from(transcripts)
+        .where(
+          and(
+            sql`${transcripts.canonicalAssetId} IS NOT NULL`,
+            sql`${transcripts.deletedAt} IS NULL`,
+            sql`(${transcripts.content} IS NULL OR ${transcripts.content} = '' OR ${transcripts.metadata}->>'transcript_content' IS NULL)`,
+            eq(transcripts.eventSessionId, options.eventSessionId)
+          )
+        )
+        .limit(limit);
+    }
+
+    const rows = await query;
+    console.log(`[bulkRefreshTranscriptContent] Found ${rows.length} transcripts to process`);
+
+    for (const row of rows) {
+      processed++;
+      if (!row.canonicalAssetId) continue;
+
+      try {
+        const contentResult = await fetchAssetContent(row.canonicalAssetId);
+        if (contentResult) {
+          await db.update(transcripts)
+            .set({
+              content: contentResult.content,
+              metadata: {
+                ...((row.metadata as Record<string, any>) || {}),
+                transcript_content: contentResult.content,
+                content_format: contentResult.format,
+                content_fetched_at: new Date().toISOString(),
+              },
+              updatedAt: new Date(),
+            })
+            .where(eq(transcripts.id, row.id));
+          updated++;
+          console.log(`[bulkRefreshTranscriptContent] Updated transcript ${row.id}`);
+        } else {
+          errors.push(`${row.id}: Failed to fetch content`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        errors.push(`${row.id}: ${msg}`);
+        console.warn(`[bulkRefreshTranscriptContent] Error for ${row.id}:`, err);
+      }
+    }
+
+    revalidatePath("/transcripts");
+    return { success: true, processed, updated, errors };
+  } catch (error) {
+    console.error("[bulkRefreshTranscriptContent] Error:", error);
+    return {
+      success: false,
+      processed,
+      updated,
+      errors: [...errors, error instanceof Error ? error.message : "Unknown error"]
+    };
+  }
 }
 
 // Link an existing transcript to a session

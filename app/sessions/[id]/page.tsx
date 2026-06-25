@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts } from "@/lib/db/schema";
+import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts, relatedAsset } from "@/lib/db/schema";
 import { eq, asc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { deleteSession } from "@/lib/actions";
 import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 import { TranscriptList } from "@/components/transcript-list";
 import { SessionAssetsSection } from "@/components/session-assets-section";
+import { RelatedAssetsSection } from "@/components/related-assets-section";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,31 @@ export default async function SessionDetailPage({
     .from(sessionCategories)
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
     .where(eq(sessionCategories.eventSessionId, params.id));
+
+  // Get related assets for this session
+  const relatedAssetAlias = aliasedTable(asset, "related_asset_file");
+  const sessionRelatedAssets = await db
+    .select({
+      id: relatedAsset.id,
+      assetId: relatedAsset.assetId,
+      title: relatedAssetAlias.title,
+      name: relatedAssetAlias.name,
+      assetType: relatedAssetAlias.assetType,
+      relatedType: relatedAsset.relatedType,
+      label: relatedAsset.label,
+      sequence: relatedAsset.sequence,
+    })
+    .from(relatedAsset)
+    .innerJoin(relatedAssetAlias, eq(relatedAsset.assetId, relatedAssetAlias.id))
+    .where(
+      and(
+        eq(relatedAsset.ownerType, "event_session"),
+        eq(relatedAsset.ownerId, params.id),
+        isNull(relatedAsset.deletedAt),
+        isNull(relatedAssetAlias.deletedAt)
+      )
+    )
+    .orderBy(asc(relatedAsset.sequence));
 
   // Get transcripts for this session with media and canonical asset info via JOINs
   const mediaAsset = aliasedTable(asset, "media_asset");
@@ -393,6 +419,7 @@ export default async function SessionDetailPage({
             sessionName={session.sessionName}
             assets={sessionAssetLinks.map((link) => ({
               id: link.asset.id,
+              linkId: link.linkId,
               title: link.asset.title,
               name: link.asset.name,
               assetType: link.asset.assetType,
@@ -428,6 +455,14 @@ export default async function SessionDetailPage({
               stage: tr.stage,
               isSynced: !!tr.subtitleTrackId,
             }))}
+          />
+
+          {/* Related Assets */}
+          <RelatedAssetsSection
+            ownerType="event_session"
+            ownerId={params.id}
+            ownerName={session.sessionName}
+            assets={sessionRelatedAssets}
           />
         </div>
 

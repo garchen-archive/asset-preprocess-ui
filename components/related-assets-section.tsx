@@ -1,0 +1,423 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { AsyncSearchableSelect } from "@/components/async-searchable-select";
+import { useToast } from "@/components/ui/use-toast";
+import { useRouter } from "next/navigation";
+import { RELATED_ASSET_TYPE_OPTIONS, getRelatedAssetTypeLabel } from "@/lib/related-asset-types";
+
+interface RelatedAssetLink {
+  id: string; // related_asset.id
+  assetId: string;
+  title: string | null;
+  name: string | null;
+  assetType: string | null;
+  relatedType: string | null;
+  label: string | null;
+  sequence: number | null;
+}
+
+interface RelatedAssetsSectionProps {
+  ownerType: "event" | "event_session";
+  ownerId: string;
+  ownerName: string;
+  assets: RelatedAssetLink[];
+}
+
+export function RelatedAssetsSection({
+  ownerType,
+  ownerId,
+  ownerName,
+  assets,
+}: RelatedAssetsSectionProps) {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [assetId, setAssetId] = useState("");
+  const [assetLabel, setAssetLabel] = useState("");
+  const [relatedType, setRelatedType] = useState("document");
+  const [label, setLabel] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
+
+  // Sort assets by sequence
+  const sortedAssets = [...assets].sort((a, b) => {
+    const seqA = a.sequence ?? 999;
+    const seqB = b.sequence ?? 999;
+    return seqA - seqB;
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!assetId) {
+      toast({
+        title: "Error",
+        description: "Please select an asset",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: "/api/v1/admin/related-assets",
+          method: "POST",
+          data: {
+            owner_type: ownerType,
+            owner_id: ownerId,
+            asset_id: assetId,
+            related_type: relatedType,
+            label: label || undefined,
+            sequence: sortedAssets.length, // Add at the end
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        if (result.status === 409) {
+          throw new Error("This asset is already attached");
+        }
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Asset attached",
+        description: `${assetLabel || "Asset"} has been added as a related asset.`,
+      });
+
+      resetForm();
+      setIsFormOpen(false);
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to attach asset",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setAssetId("");
+    setAssetLabel("");
+    setRelatedType("document");
+    setLabel("");
+  };
+
+  const handleRelatedTypeChange = async (relatedAssetId: string, newRelatedType: string) => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/related-assets/${relatedAssetId}`,
+          method: "PATCH",
+          data: {
+            related_type: newRelatedType,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Type updated",
+        description: "Related asset type has been updated.",
+      });
+
+      setEditingId(null);
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update type",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleMove = async (relatedAssetId: string, direction: "up" | "down") => {
+    const currentIndex = sortedAssets.findIndex((a) => a.id === relatedAssetId);
+    if (currentIndex === -1) return;
+    if (direction === "up" && currentIndex === 0) return;
+    if (direction === "down" && currentIndex === sortedAssets.length - 1) return;
+
+    const swapIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    const currentAsset = sortedAssets[currentIndex];
+    const swapAsset = sortedAssets[swapIndex];
+
+    // Swap sequences using individual PATCH calls
+    const currentNewSeq = swapAsset.sequence ?? swapIndex;
+    const swapNewSeq = currentAsset.sequence ?? currentIndex;
+
+    try {
+      // Update both assets' sequences
+      const [res1, res2] = await Promise.all([
+        fetch("/api/pipeline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            endpoint: `/api/v1/admin/related-assets/${currentAsset.id}`,
+            method: "PATCH",
+            data: { sequence: currentNewSeq },
+          }),
+        }),
+        fetch("/api/pipeline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            endpoint: `/api/v1/admin/related-assets/${swapAsset.id}`,
+            method: "PATCH",
+            data: { sequence: swapNewSeq },
+          }),
+        }),
+      ]);
+
+      const result1 = await res1.json();
+      const result2 = await res2.json();
+
+      if (!res1.ok || result1.status >= 400 || !res2.ok || result2.status >= 400) {
+        throw new Error("Failed to update sequence");
+      }
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to reorder",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemove = async (relatedAssetId: string) => {
+    if (!confirm("Remove this related asset?")) return;
+
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/related-assets/${relatedAssetId}`,
+          method: "DELETE",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Asset removed",
+        description: "Related asset has been removed.",
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove asset",
+        variant: "destructive",
+      });
+    }
+  };
+
+  return (
+    <div className="rounded-lg border p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Related Assets ({assets.length})</h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setIsFormOpen(!isFormOpen)}
+        >
+          {isFormOpen ? "Cancel" : "Attach Related Asset"}
+        </Button>
+      </div>
+
+      {/* Add Form */}
+      {isFormOpen && (
+        <form onSubmit={handleSubmit} className="border rounded-lg p-3 bg-muted/30 mb-4">
+          <div className="flex flex-wrap items-end gap-3">
+            {/* Asset Search */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Asset</label>
+              <AsyncSearchableSelect
+                searchEndpoint="/api/search/assets?type=non-media"
+                placeholder="Search for documents, images..."
+                value={assetId}
+                onChange={(value, labelText) => {
+                  setAssetId(value);
+                  setAssetLabel(labelText || "");
+                }}
+                transformResult={(item) => ({
+                  value: item.id,
+                  label: `${item.title || item.name} (${item.assetType || "unknown"}) [${item.id.slice(0, 8)}]`,
+                })}
+              />
+            </div>
+
+            {/* Related Type */}
+            <div className="w-32">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Type</label>
+              <select
+                value={relatedType}
+                onChange={(e) => setRelatedType(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
+              >
+                {RELATED_ASSET_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Label */}
+            <div className="w-32">
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Label</label>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Optional"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
+              />
+            </div>
+
+            {/* Submit */}
+            <Button type="submit" size="sm" disabled={isSubmitting || !assetId} className="h-10">
+              {isSubmitting ? "Adding..." : "Add"}
+            </Button>
+          </div>
+        </form>
+      )}
+
+      {/* Assets List */}
+      {sortedAssets.length > 0 ? (
+        <div className="rounded-md border">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-2 py-3 text-left text-sm font-medium w-12">#</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Asset</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Label</th>
+                <th className="px-4 py-3 text-left text-sm font-medium w-24">Order</th>
+                <th className="px-4 py-3 text-left text-sm font-medium w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedAssets.map((asset, index) => (
+                <tr key={asset.id} className="border-b hover:bg-muted/50">
+                  <td className="px-2 py-3 text-sm text-center text-muted-foreground">
+                    {(asset.sequence ?? index) + 1}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <Link
+                      href={`/assets/${asset.assetId}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {asset.title || asset.name || "Untitled"}
+                    </Link>
+                    {asset.assetType && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        ({asset.assetType})
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {editingId === asset.id ? (
+                      <select
+                        value={asset.relatedType || "other"}
+                        onChange={(e) => handleRelatedTypeChange(asset.id, e.target.value)}
+                        onBlur={() => setEditingId(null)}
+                        disabled={isUpdating}
+                        autoFocus
+                        className="text-xs border rounded px-1 py-0.5 bg-background"
+                      >
+                        {RELATED_ASSET_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <button
+                        onClick={() => setEditingId(asset.id)}
+                        className="hover:bg-muted rounded px-1 py-0.5 transition-colors"
+                        title="Click to edit type"
+                      >
+                        <Badge variant="outline" className="text-xs cursor-pointer">
+                          {getRelatedAssetTypeLabel(asset.relatedType) || "Other"}
+                        </Badge>
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    {asset.label || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleMove(asset.id, "up")}
+                        disabled={index === 0}
+                        className="p-1 hover:bg-muted rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => handleMove(asset.id, "down")}
+                        disabled={index === sortedAssets.length - 1}
+                        className="p-1 hover:bg-muted rounded disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <button
+                      onClick={() => handleRemove(asset.id)}
+                      className="text-red-600 hover:underline text-xs"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          No related assets yet. Click "Add Related Asset" to attach supplemental materials.
+        </p>
+      )}
+    </div>
+  );
+}

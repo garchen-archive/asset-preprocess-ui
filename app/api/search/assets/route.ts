@@ -1,6 +1,6 @@
 import { db } from "@/lib/db/client";
 import { archiveAssets } from "@/lib/db/schema";
-import { or, ilike, eq, and, isNull } from "drizzle-orm";
+import { or, ilike, eq, and, isNull, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -17,7 +17,29 @@ export async function GET(request: NextRequest) {
 
   let whereClause;
 
-  if (type === "media") {
+  if (type === "all") {
+    // All assets
+    whereClause = and(
+      isNull(archiveAssets.deletedAt),
+      or(
+        ilike(archiveAssets.name, searchPattern),
+        ilike(archiveAssets.title, searchPattern),
+        ilike(archiveAssets.descriptionSummary, searchPattern)
+      )
+    );
+  } else if (type === "non-media") {
+    // Non-media assets: documents, images, etc. (for related assets)
+    // Includes everything except video/audio
+    whereClause = and(
+      isNull(archiveAssets.deletedAt),
+      sql`(${archiveAssets.assetType} IS NULL OR ${archiveAssets.assetType} NOT IN ('video', 'audio'))`,
+      or(
+        ilike(archiveAssets.name, searchPattern),
+        ilike(archiveAssets.title, searchPattern),
+        ilike(archiveAssets.descriptionSummary, searchPattern)
+      )
+    );
+  } else if (type === "media") {
     // Media assets: video, audio, or isMediaFile=true
     whereClause = and(
       isNull(archiveAssets.deletedAt),

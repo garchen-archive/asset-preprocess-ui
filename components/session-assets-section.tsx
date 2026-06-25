@@ -7,17 +7,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { SessionBulkSync } from "@/components/session-bulk-sync";
-
-const VARIANT_TYPES = [
-  { value: "source", label: "Source" },
-  { value: "transcoded", label: "Transcoded" },
-  { value: "proxy", label: "Proxy" },
-  { value: "audio_only", label: "Audio Only" },
-  { value: "video_only", label: "Video Only" },
-];
+import { VARIANT_TYPE_OPTIONS } from "@/lib/variant-types";
 
 interface AssetLink {
   id: string;
+  linkId: string;
   title: string | null;
   name: string | null;
   assetType: string | null;
@@ -115,6 +109,41 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
     setIsLinkFormOpen(false);
   };
 
+  const handleVariantChange = async (linkId: string, newVariantType: string) => {
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/session-assets/${linkId}`,
+          method: "PATCH",
+          data: {
+            variant_type: newVariantType,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Variant updated",
+        description: "Asset variant type has been updated.",
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update variant",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="rounded-lg border p-6">
       {/* Header */}
@@ -166,7 +195,7 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
                 onChange={(e) => setVariantType(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-2 py-2 text-sm"
               >
-                {VARIANT_TYPES.map((vt) => (
+                {VARIANT_TYPE_OPTIONS.map((vt) => (
                   <option key={vt.value} value={vt.value}>
                     {vt.label}
                   </option>
@@ -214,6 +243,7 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
           assets={assets}
           showVariantColumn
           tableId="assets"
+          onVariantChange={handleVariantChange}
         />
       ) : (
         <p className="text-sm text-muted-foreground">

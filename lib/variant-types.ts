@@ -2,11 +2,12 @@
 
 export const VARIANT_TYPES = {
   source: "Source",
-  edited: "Edited",
   camera_angle: "Camera Angle",
-  audio: "Audio Only",
+  audio: "Audio",
   backup: "Backup",
   alternate: "Alternate",
+  edited: "Edited",
+  interpretation: "With Interpreter",
 } as const;
 
 export type VariantType = keyof typeof VARIANT_TYPES;
