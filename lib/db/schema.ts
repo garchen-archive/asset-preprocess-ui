@@ -721,6 +721,7 @@ export const collection = pgTable("collection", {
   name: text("name").notNull(),
   description: text("description"),
   isDefault: boolean("is_default").notNull().default(false),
+  status: text("status").default("draft"), // publication status: draft, in_review, approved, published, needs_work, archived
   visibility: text("visibility").notNull().default("private"), // private, shared, public
   metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

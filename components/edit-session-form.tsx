@@ -178,6 +178,23 @@ export function EditSessionForm({
               </select>
             </div>
 
+            <div>
+              <Label htmlFor="publicationStatus">Publication Status</Label>
+              <select
+                id="publicationStatus"
+                name="publicationStatus"
+                defaultValue={session.publicationStatus || "draft"}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="draft">Draft</option>
+                <option value="in_review">In Review</option>
+                <option value="approved">Approved</option>
+                <option value="published">Published</option>
+                <option value="needs_work">Needs Work</option>
+                <option value="archived">Archived</option>
+              </select>
+            </div>
+
             <div className="md:col-span-2">
               <MultiSelectWithCreate
                 name="categoryIds"

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ReorderableCollectionItems } from "@/components/reorderable-collection-items";
+import { StatusBadge } from "@/components/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -108,12 +109,21 @@ export default async function CollectionDetailPage({
       </div>
 
       {/* Metadata */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg border bg-muted/30">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 p-4 rounded-lg border bg-muted/30">
         <div>
           <p className="text-sm text-muted-foreground">Scope</p>
           <Badge className={scopeBadgeColor(c.scope)} variant="outline">
             {c.scope}
           </Badge>
+        </div>
+        <div>
+          <p className="text-sm text-muted-foreground">Status</p>
+          <StatusBadge
+            entityType="collection"
+            entityId={c.id}
+            statusField="status"
+            currentValue={c.status}
+          />
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Visibility</p>

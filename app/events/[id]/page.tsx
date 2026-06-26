@@ -14,6 +14,8 @@ import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { GenerateCollectionButton } from "@/components/generate-collection-button";
 import { EventBulkSync } from "@/components/event-bulk-sync";
 import { RelatedAssetsSection } from "@/components/related-assets-section";
+import { StatusBadge } from "@/components/status-badge";
+import { PublishEventButton } from "@/components/publish-event-button";
 
 export const dynamic = "force-dynamic";
 
@@ -292,9 +294,16 @@ export default async function EventDetailPage({
           <Breadcrumbs items={breadcrumbItems} />
           <h1 className="text-3xl font-bold">{event.eventName}</h1>
         </div>
-        <Button asChild>
-          <Link href={`/events/${params.id}/edit`}>Edit</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <PublishEventButton
+            eventId={params.id}
+            eventName={event.eventName}
+            sessionCount={eventSessions.length}
+          />
+          <Button asChild>
+            <Link href={`/events/${params.id}/edit`}>Edit</Link>
+          </Button>
+        </div>
       </div>
 
       {/* Parent Event Badge */}
@@ -678,6 +687,7 @@ export default async function EventDetailPage({
                     <tr className="border-b bg-muted/50">
                       <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Items</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Visibility</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Default</th>
                       <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
@@ -695,6 +705,14 @@ export default async function EventDetailPage({
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">{itemCount}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <StatusBadge
+                            entityType="collection"
+                            entityId={c.id}
+                            statusField="status"
+                            currentValue={c.status}
+                          />
+                        </td>
                         <td className="px-4 py-3 text-sm">
                           <Badge variant="outline" className="text-xs">{c.visibility}</Badge>
                         </td>
@@ -784,19 +802,25 @@ export default async function EventDetailPage({
             <h2 className="text-xl font-semibold mb-4">Administrative</h2>
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                <dt className="text-sm font-medium text-muted-foreground">Cataloging Status</dt>
                 <dd className="text-sm mt-1">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      event.catalogingStatus === "Ready"
-                        ? "bg-green-100 text-green-700"
-                        : event.catalogingStatus === "In Progress"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {event.catalogingStatus || "Not Started"}
-                  </span>
+                  <StatusBadge
+                    entityType="event"
+                    entityId={params.id}
+                    statusField="cataloging_status"
+                    currentValue={event.catalogingStatus}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Publication Status</dt>
+                <dd className="text-sm mt-1">
+                  <StatusBadge
+                    entityType="event"
+                    entityId={params.id}
+                    statusField="publication_status"
+                    currentValue={event.publicationStatus}
+                  />
                 </dd>
               </div>
               <div>
@@ -908,14 +932,29 @@ export default async function EventDetailPage({
           {/* Danger Zone */}
           <div className="rounded-lg border border-destructive/50 p-6">
             <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
-            <p className="text-sm text-muted-foreground mb-4">
-              Deleting this event will also delete all associated sessions.
-            </p>
-            <form action={deleteEvent.bind(null, params.id)}>
-              <Button type="submit" variant="destructive" size="sm">
-                Delete Event
-              </Button>
-            </form>
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Unpublish this event and all its sessions, assets, and transcripts.
+                </p>
+                <PublishEventButton
+                  eventId={params.id}
+                  eventName={event.eventName}
+                  sessionCount={eventSessions.length}
+                  variant="unpublish"
+                />
+              </div>
+              <div className="border-t pt-4">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Deleting this event will also delete all associated sessions.
+                </p>
+                <form action={deleteEvent.bind(null, params.id)}>
+                  <Button type="submit" variant="destructive" size="sm">
+                    Delete Event
+                  </Button>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       </div>

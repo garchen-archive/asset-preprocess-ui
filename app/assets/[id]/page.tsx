@@ -12,6 +12,7 @@ import { MuxVideoPlayer } from "@/components/mux-video-player";
 import { getVariantLabel } from "@/lib/variant-types";
 import { AssetMuxIntegration } from "@/components/asset-mux-integration";
 import { getMuxDashboardUrl } from "@/lib/mux";
+import { StatusBadge } from "@/components/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +232,7 @@ export default async function AssetDetailPage({
                     </div>
                   ) : null
                 }
+                eventSessionId={sessionLinks.length > 0 ? sessionLinks[0].sessionId : null}
               />
             );
           })()}
@@ -556,37 +558,23 @@ export default async function AssetDetailPage({
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Processing Status</dt>
                 <dd className="text-sm mt-1">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      data.processingStatus === "transcoded"
-                        ? "bg-green-100 text-green-700"
-                        : data.processingStatus === "ingesting"
-                        ? "bg-blue-100 text-blue-700"
-                        : data.processingStatus === "queued"
-                        ? "bg-purple-100 text-purple-700"
-                        : data.processingStatus === "failed"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {data.processingStatus || "imported"}
-                  </span>
+                  <StatusBadge
+                    entityType="asset"
+                    entityId={params.id}
+                    statusField="processing_status"
+                    currentValue={data.processingStatus}
+                  />
                 </dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Publication Status</dt>
                 <dd className="text-sm mt-1">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      data.publicationStatus === "published"
-                        ? "bg-green-100 text-green-700"
-                        : data.publicationStatus === "archived"
-                        ? "bg-slate-100 text-slate-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {data.publicationStatus || "draft"}
-                  </span>
+                  <StatusBadge
+                    entityType="asset"
+                    entityId={params.id}
+                    statusField="publication_status"
+                    currentValue={data.publicationStatus}
+                  />
                 </dd>
               </div>
               <div>
@@ -773,19 +761,14 @@ export default async function AssetDetailPage({
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                <dt className="text-sm font-medium text-muted-foreground">Cataloging Status</dt>
                 <dd className="text-sm mt-1">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      data.catalogingStatus === "Ready"
-                        ? "bg-green-100 text-green-700"
-                        : data.catalogingStatus === "In Progress"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {data.catalogingStatus || "Not Started"}
-                  </span>
+                  <StatusBadge
+                    entityType="asset"
+                    entityId={params.id}
+                    statusField="cataloging_status"
+                    currentValue={data.catalogingStatus}
+                  />
                 </dd>
               </div>
               <div>

@@ -477,6 +477,7 @@ export async function updateEvent(id: string, formData: FormData) {
     eventFormat: formData.get("eventFormat") as string || null,
     eventDescription: formData.get("eventDescription") as string || null,
     catalogingStatus: formData.get("catalogingStatus") as string || null,
+    publicationStatus: formData.get("publicationStatus") as string || "draft",
     notes: formData.get("notes") as string || null,
     additionalMetadata: Object.keys(additionalMetadata).length > 0 ? additionalMetadata : null,
     updatedAt: new Date(),
@@ -638,6 +639,8 @@ export async function updateSession(id: string, formData: FormData) {
         notes: formData.get("notes") as string || null,
         day_number: formData.get("dayNumber") ? parseInt(formData.get("dayNumber") as string) : undefined,
         day_label: formData.get("dayLabel") as string || undefined,
+        cataloging_status: formData.get("catalogingStatus") as string || null,
+        publication_status: formData.get("publicationStatus") as string || "draft",
         metadata,
       }),
     }
