@@ -16,6 +16,7 @@ import { EventBulkSync } from "@/components/event-bulk-sync";
 import { RelatedAssetsSection } from "@/components/related-assets-section";
 import { StatusBadge } from "@/components/status-badge";
 import { PublishEventButton } from "@/components/publish-event-button";
+import { CmsSyncButton } from "@/components/cms-sync-button";
 
 export const dynamic = "force-dynamic";
 
@@ -299,6 +300,10 @@ export default async function EventDetailPage({
             eventId={params.id}
             eventName={event.eventName}
             sessionCount={eventSessions.length}
+          />
+          <CmsSyncButton
+            eventId={params.id}
+            eventName={event.eventName}
           />
           <Button asChild>
             <Link href={`/events/${params.id}/edit`}>Edit</Link>
