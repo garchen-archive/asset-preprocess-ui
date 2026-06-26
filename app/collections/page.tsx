@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/pagination";
+import { StatusBadge } from "@/components/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -231,6 +232,7 @@ export default async function CollectionsPage({
               <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Event</th>
               <th className="px-4 py-3 text-left text-sm font-medium">Scope</th>
+              <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
               <th className="px-4 py-3 text-left text-sm font-medium">
                 Visibility
               </th>
@@ -277,6 +279,14 @@ export default async function CollectionsPage({
                   </Badge>
                 </td>
                 <td className="px-4 py-3">
+                  <StatusBadge
+                    entityType="collection"
+                    entityId={c.id}
+                    statusField="status"
+                    currentValue={c.status}
+                  />
+                </td>
+                <td className="px-4 py-3">
                   <Badge
                     className={visibilityBadgeColor(c.visibility)}
                     variant="outline"
@@ -299,7 +309,7 @@ export default async function CollectionsPage({
             ))}
             {collectionsList.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                   No collections found
                 </td>
               </tr>

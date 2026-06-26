@@ -11,6 +11,7 @@ import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 import { TranscriptList } from "@/components/transcript-list";
 import { SessionAssetsSection } from "@/components/session-assets-section";
 import { RelatedAssetsSection } from "@/components/related-assets-section";
+import { StatusBadge } from "@/components/status-badge";
 
 export const dynamic = "force-dynamic";
 
@@ -472,19 +473,25 @@ export default async function SessionDetailPage({
             <h2 className="text-xl font-semibold mb-4">Administrative</h2>
             <dl className="space-y-4">
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                <dt className="text-sm font-medium text-muted-foreground">Cataloging Status</dt>
                 <dd className="text-sm mt-1">
-                  <span
-                    className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                      session.catalogingStatus === "Ready"
-                        ? "bg-green-100 text-green-700"
-                        : session.catalogingStatus === "In Progress"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-gray-100 text-gray-700"
-                    }`}
-                  >
-                    {session.catalogingStatus || "Not Started"}
-                  </span>
+                  <StatusBadge
+                    entityType="session"
+                    entityId={params.id}
+                    statusField="cataloging_status"
+                    currentValue={session.catalogingStatus}
+                  />
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">Publication Status</dt>
+                <dd className="text-sm mt-1">
+                  <StatusBadge
+                    entityType="session"
+                    entityId={params.id}
+                    statusField="publication_status"
+                    currentValue={session.publicationStatus}
+                  />
                 </dd>
               </div>
               <div>

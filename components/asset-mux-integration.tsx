@@ -32,6 +32,8 @@ interface AssetMuxIntegrationProps {
   transcripts: TranscriptData[];
   showVideoPlayer?: boolean;
   videoPlayerComponent?: React.ReactNode;
+  // For linking transcripts to a session when creating from asset page
+  eventSessionId?: string | null;
 }
 
 export function AssetMuxIntegration({
@@ -47,6 +49,7 @@ export function AssetMuxIntegration({
   transcripts,
   showVideoPlayer = false,
   videoPlayerComponent,
+  eventSessionId,
 }: AssetMuxIntegrationProps) {
   const router = useRouter();
 
@@ -83,6 +86,7 @@ export function AssetMuxIntegration({
         transcripts={transcripts}
         isMuxSynced={isMuxSynced}
         onRefresh={handleSyncComplete}
+        eventSessionId={eventSessionId}
       />
     </div>
   );

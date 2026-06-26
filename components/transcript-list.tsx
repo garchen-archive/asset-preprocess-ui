@@ -56,6 +56,7 @@ interface TranscriptListProps {
   mediaAssetId?: string;
   assetType?: string | null;
   isMuxSynced?: boolean;
+  eventSessionId?: string | null; // For linking transcripts to session when creating from asset page
 
   // Common
   onRefresh?: () => void;
@@ -73,6 +74,7 @@ export function TranscriptList({
   mediaAssetId,
   assetType,
   isMuxSynced = false,
+  eventSessionId,
   // Common
   onRefresh,
 }: TranscriptListProps) {
@@ -424,6 +426,8 @@ export function TranscriptList({
       }
     : {
         mediaAssetId,
+        // Pass sessionId so transcripts created from asset page can be linked to the session
+        sessionId: eventSessionId || undefined,
       };
 
   // ========== Render ==========
