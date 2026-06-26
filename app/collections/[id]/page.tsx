@@ -38,6 +38,7 @@ export default async function CollectionDetailPage({
       item: collectionItem,
       sessionName: eventSession.sessionName,
       sessionDate: eventSession.sessionDate,
+      sessionDayNumber: eventSession.dayNumber,
       assetTitle: asset.title,
     })
     .from(collectionItem)
@@ -153,10 +154,11 @@ export default async function CollectionDetailPage({
 
         <ReorderableCollectionItems
           collectionId={params.id}
-          items={items.map(({ item, sessionName, assetTitle }) => ({
+          items={items.map(({ item, sessionName, sessionDayNumber, assetTitle }) => ({
             id: item.id,
             sequence: item.sequence,
             label: item.label,
+            dayNumber: sessionDayNumber,
             dayLabel: item.dayLabel,
             playlistRole: item.playlistRole,
             isContinuation: item.isContinuation,

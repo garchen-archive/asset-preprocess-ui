@@ -10,6 +10,7 @@ interface CollectionItemData {
   id: string;
   sequence: number;
   label: string | null;
+  dayNumber: number | null;
   dayLabel: string | null;
   playlistRole: string | null;
   isContinuation: boolean;
@@ -31,6 +32,10 @@ export function ReorderableCollectionItems({
   const [items, setItems] = useState(initialItems);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [editingDayLabel, setEditingDayLabel] = useState<string | null>(null);
+  const [editingDayLabelValue, setEditingDayLabelValue] = useState("");
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState("");
   const { toast } = useToast();
 
   const moveItem = (index: number, direction: "up" | "down") => {
@@ -92,6 +97,136 @@ export function ReorderableCollectionItems({
   const resetOrder = () => {
     setItems(initialItems);
     setHasChanges(false);
+  };
+
+  const startEditingDayLabel = (itemId: string, currentValue: string | null) => {
+    setEditingDayLabel(itemId);
+    setEditingDayLabelValue(currentValue || "");
+  };
+
+  const saveDayLabel = async (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // If value hasn't changed, just close
+    if (editingDayLabelValue === (item.dayLabel || "")) {
+      setEditingDayLabel(null);
+      return;
+    }
+
+    setIsUpdating(itemId);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/collections/${collectionId}/items/${itemId}`,
+          method: "PATCH",
+          data: {
+            day_label: editingDayLabelValue || null,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || "Failed to update day label");
+      }
+
+      // Update local state
+      setItems(items.map(i =>
+        i.id === itemId ? { ...i, dayLabel: editingDayLabelValue || null } : i
+      ));
+
+      toast({
+        title: "Day label updated",
+        description: editingDayLabelValue ? `Set to "${editingDayLabelValue}"` : "Day label cleared",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update day label",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(null);
+      setEditingDayLabel(null);
+    }
+  };
+
+  const handleDayLabelKeyDown = (e: React.KeyboardEvent, itemId: string) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveDayLabel(itemId);
+    } else if (e.key === "Escape") {
+      setEditingDayLabel(null);
+    }
+  };
+
+  const startEditingLabel = (itemId: string, currentValue: string | null) => {
+    setEditingLabel(itemId);
+    setEditingLabelValue(currentValue || "");
+  };
+
+  const saveLabel = async (itemId: string) => {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    // If value hasn't changed, just close
+    if (editingLabelValue === (item.label || "")) {
+      setEditingLabel(null);
+      return;
+    }
+
+    setIsUpdating(itemId);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/collections/${collectionId}/items/${itemId}`,
+          method: "PATCH",
+          data: {
+            label: editingLabelValue || null,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || "Failed to update label");
+      }
+
+      // Update local state
+      setItems(items.map(i =>
+        i.id === itemId ? { ...i, label: editingLabelValue || null } : i
+      ));
+
+      toast({
+        title: "Label updated",
+        description: editingLabelValue ? `Set to "${editingLabelValue}"` : "Label cleared",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update label",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(null);
+      setEditingLabel(null);
+    }
+  };
+
+  const handleLabelKeyDown = (e: React.KeyboardEvent, itemId: string) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveLabel(itemId);
+    } else if (e.key === "Escape") {
+      setEditingLabel(null);
+    }
   };
 
   const removeItem = async (itemId: string) => {
@@ -165,7 +300,8 @@ export function ReorderableCollectionItems({
                 <th className="px-4 py-3 text-left text-sm font-medium w-20">Order</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Label</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Session/Asset</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Day</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Day #</th>
+                <th className="px-4 py-3 text-left text-sm font-medium">Day Label</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
                 <th className="px-4 py-3 text-left text-sm font-medium w-32">Actions</th>
               </tr>
@@ -177,12 +313,34 @@ export function ReorderableCollectionItems({
                     {item.sequence}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="font-medium">{item.label || "—"}</span>
-                    {item.isContinuation && (
-                      <Badge variant="outline" className="ml-2 text-xs">
-                        Continuation
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {editingLabel === item.id ? (
+                        <input
+                          type="text"
+                          value={editingLabelValue}
+                          onChange={(e) => setEditingLabelValue(e.target.value)}
+                          onBlur={() => saveLabel(item.id)}
+                          onKeyDown={(e) => handleLabelKeyDown(e, item.id)}
+                          disabled={isUpdating === item.id}
+                          autoFocus
+                          placeholder="Item label"
+                          className="flex-1 px-2 py-1 text-sm border rounded bg-background"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => startEditingLabel(item.id, item.label)}
+                          className="hover:bg-muted px-2 py-1 rounded transition-colors text-left font-medium"
+                          title="Click to edit label"
+                        >
+                          {item.label || <span className="text-muted-foreground font-normal">—</span>}
+                        </button>
+                      )}
+                      {item.isContinuation && (
+                        <Badge variant="outline" className="text-xs">
+                          Continuation
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     {item.eventSessionId && item.sessionName && (
@@ -205,8 +363,31 @@ export function ReorderableCollectionItems({
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    {item.dayNumber ?? "—"}
+                  </td>
                   <td className="px-4 py-3 text-sm">
-                    {item.dayLabel || "—"}
+                    {editingDayLabel === item.id ? (
+                      <input
+                        type="text"
+                        value={editingDayLabelValue}
+                        onChange={(e) => setEditingDayLabelValue(e.target.value)}
+                        onBlur={() => saveDayLabel(item.id)}
+                        onKeyDown={(e) => handleDayLabelKeyDown(e, item.id)}
+                        disabled={isUpdating === item.id}
+                        autoFocus
+                        placeholder="e.g., Day 1"
+                        className="w-24 px-2 py-1 text-sm border rounded bg-background"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => startEditingDayLabel(item.id, item.dayLabel)}
+                        className="hover:bg-muted px-2 py-1 rounded transition-colors text-left min-w-[60px]"
+                        title="Click to edit day label"
+                      >
+                        {item.dayLabel || <span className="text-muted-foreground">—</span>}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {item.playlistRole ? (
