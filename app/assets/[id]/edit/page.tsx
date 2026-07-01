@@ -403,7 +403,7 @@ export default async function AssetEditPage({
                 <option value="imported">Imported</option>
                 <option value="queued">Queued</option>
                 <option value="ingesting">Ingesting</option>
-                <option value="transcoded">Transcoded</option>
+                <option value="ready">Ready</option>
                 <option value="failed">Failed</option>
               </select>
             </div>

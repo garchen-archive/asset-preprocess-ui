@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { archiveAssets, sessions, events, transcripts, eventSessionAsset } from "@/lib/db/schema";
+import { archiveAssets, sessions, events, transcripts, eventSessionAsset, assetExternalRef } from "@/lib/db/schema";
 import { eq, isNull, and, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import { getVariantLabel } from "@/lib/variant-types";
 import { AssetMuxIntegration } from "@/components/asset-mux-integration";
 import { getMuxDashboardUrl } from "@/lib/mux";
 import { StatusBadge } from "@/components/status-badge";
+import { RefreshMetadataButton } from "@/components/refresh-metadata-button";
+import { AssetCdnSync } from "@/components/asset-cdn-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -111,6 +113,40 @@ export default async function AssetDetailPage({
       isNull(eventSessionAsset.deletedAt)
     ));
 
+  // Check for CDN delivery ref (backblaze delivery)
+  const [deliveryRef] = await db
+    .select()
+    .from(assetExternalRef)
+    .where(and(
+      eq(assetExternalRef.assetId, params.id),
+      eq(assetExternalRef.provider, "backblaze"),
+      eq(assetExternalRef.providerCategory, "delivery"),
+      eq(assetExternalRef.status, "active")
+    ))
+    .limit(1);
+
+  const hasDeliveryRef = !!deliveryRef;
+
+  // Check for Mux media ref (for video/audio playback)
+  const [muxRef] = await db
+    .select()
+    .from(assetExternalRef)
+    .where(and(
+      eq(assetExternalRef.assetId, params.id),
+      eq(assetExternalRef.provider, "mux"),
+      eq(assetExternalRef.status, "active")
+    ))
+    .limit(1);
+
+  // Extract Mux data from external ref
+  const muxData = muxRef ? {
+    assetId: muxRef.externalId,
+    playbackId: muxRef.secondaryId,
+    status: (muxRef.metadata as { status?: string })?.status,
+    duration: (muxRef.metadata as { duration?: number })?.duration,
+    aspectRatio: (muxRef.metadata as { aspect_ratio?: string })?.aspect_ratio,
+  } : null;
+
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
     { label: "Assets", href: "/assets" },
@@ -184,29 +220,35 @@ export default async function AssetDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Main details */}
         <div className="lg:col-span-2 space-y-6">
+          {/* CDN Delivery Section - Show for non-video/audio assets (images, documents, subtitles) */}
+          {(data.assetType === "image" || data.assetType === "document" || data.assetType === "subtitle") && (
+            <AssetCdnSync
+              assetId={params.id}
+              assetType={data.assetType}
+              fileName={data.name}
+              initialSynced={hasDeliveryRef}
+            />
+          )}
+
           {/* Mux Integration Section - Show for video/audio assets */}
           {(data.assetType === "video" || data.assetType === "audio") && (() => {
-            const mediaProviderData = data.additionalMetadata?.media_provider as {
-              playback_id?: string;
-              duration?: number;
-              aspect_ratio?: string;
-              status?: string;
-            } | undefined;
-
-            const playbackId = mediaProviderData?.playback_id;
-            const isReady = mediaProviderData?.status === "ready";
+            // Use muxData from external ref (preferred) or fall back to additionalMetadata
+            const playbackId = muxData?.playbackId || (data.additionalMetadata?.media_provider as { playback_id?: string })?.playback_id;
+            const muxAssetId = muxData?.assetId || data.mediaProviderAssetId;
+            const muxStatus = muxData?.status || (data.additionalMetadata?.media_provider as { status?: string })?.status;
+            const isReady = muxStatus === "ready";
 
             return (
               <AssetMuxIntegration
                 assetId={params.id}
                 assetType={data.assetType}
-                mediaProvider={data.mediaProvider}
-                mediaProviderAssetId={data.mediaProviderAssetId}
+                mediaProvider={muxData ? "mux" : data.mediaProvider}
+                mediaProviderAssetId={muxAssetId}
                 playbackId={playbackId}
-                status={mediaProviderData?.status}
-                duration={mediaProviderData?.duration}
-                aspectRatio={mediaProviderData?.aspect_ratio}
-                muxDashboardUrl={data.mediaProviderAssetId ? getMuxDashboardUrl(data.mediaProviderAssetId) : null}
+                status={muxStatus}
+                duration={muxData?.duration || (data.additionalMetadata?.media_provider as { duration?: number })?.duration}
+                aspectRatio={muxData?.aspectRatio || (data.additionalMetadata?.media_provider as { aspect_ratio?: string })?.aspect_ratio}
+                muxDashboardUrl={muxAssetId ? getMuxDashboardUrl(muxAssetId) : null}
                 transcripts={linkedTranscripts.map(tr => ({
                   id: tr.id,
                   language: tr.language,
@@ -256,6 +298,10 @@ export default async function AssetDetailPage({
                     {data.assetType || "unknown"}
                   </span>
                 </dd>
+              </div>
+              <div>
+                <dt className="text-sm font-medium text-muted-foreground">MIME Type</dt>
+                <dd className="text-sm mt-1">{data.mimeType || "—"}</dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Media File</dt>
@@ -596,17 +642,20 @@ export default async function AssetDetailPage({
 
           {/* Technical Metadata */}
           <div className="rounded-lg border p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="text-xl font-semibold">Technical Metadata</h2>
-              {(data.assetType === "video" || data.assetType === "audio") && !data.duration && (
-                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                  <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Extracting metadata...
-                </span>
-              )}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold">Technical Metadata</h2>
+                {(data.assetType === "video" || data.assetType === "audio") && !data.duration && (
+                  <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Extracting metadata...
+                  </span>
+                )}
+              </div>
+              <RefreshMetadataButton assetId={params.id} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -814,9 +863,9 @@ export default async function AssetDetailPage({
             </dl>
           </div>
 
-          {/* Links */}
+          {/* Source Links */}
           <div className="rounded-lg border p-6">
-            <h2 className="text-xl font-semibold mb-4">Links</h2>
+            <h2 className="text-xl font-semibold mb-4">Source Links</h2>
             <dl className="space-y-4">
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Google Drive</dt>
@@ -877,6 +926,59 @@ export default async function AssetDetailPage({
               </div>
             </dl>
           </div>
+
+          {/* CDN Delivery */}
+          {deliveryRef && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-xl font-semibold mb-4">CDN Delivery</h2>
+              <dl className="space-y-3">
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Provider</dt>
+                  <dd className="text-sm mt-1 capitalize">{deliveryRef.provider}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Object Key</dt>
+                  <dd className="text-xs mt-1 font-mono text-muted-foreground break-all">
+                    {deliveryRef.externalId}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Status</dt>
+                  <dd className="text-sm mt-1">
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      deliveryRef.status === "active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-700"
+                    }`}>
+                      {deliveryRef.status}
+                    </span>
+                  </dd>
+                </div>
+                {(deliveryRef.metadata as { content_type?: string })?.content_type && (
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Content Type</dt>
+                    <dd className="text-sm mt-1">
+                      {(deliveryRef.metadata as { content_type?: string }).content_type}
+                    </dd>
+                  </div>
+                )}
+                {(deliveryRef.metadata as { size?: number })?.size && (
+                  <div>
+                    <dt className="text-sm font-medium text-muted-foreground">Size</dt>
+                    <dd className="text-sm mt-1">
+                      {((deliveryRef.metadata as { size?: number }).size! / 1024).toFixed(2)} KB
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground">Synced At</dt>
+                  <dd className="text-sm mt-1">
+                    {deliveryRef.createdAt.toLocaleString()}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          )}
 
           {/* System Metadata */}
           <div className="rounded-lg border p-6">

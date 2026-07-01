@@ -76,7 +76,7 @@ export const asset = pgTable("asset_legacy", {
   // Note: teaching segments now stored in additional_metadata as teaching_segments array
 
   // PROCESSING FIELDS
-  processingStatus: text("processing_status").default("imported"), // imported, queued, ingesting, transcoded, failed
+  processingStatus: text("processing_status").default("imported"), // imported, queued, ingesting, ready, failed
   publicationStatus: text("publication_status").notNull().default("draft"), // draft, published, archived
   needsDetailedReview: boolean("needs_detailed_review").default(false),
 
@@ -785,3 +785,30 @@ export const relatedAsset = pgTable("related_asset", {
 
 export type RelatedAsset = typeof relatedAsset.$inferSelect;
 export type NewRelatedAsset = typeof relatedAsset.$inferInsert;
+
+// ============================================================================
+// RELATED_CONTENT
+// Links events or sessions to related events or sessions (max 6 per owner)
+// Polymorphic ownership pattern (like related_asset)
+// ============================================================================
+
+export const relatedContent = pgTable("related_content", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  // Polymorphic owner (event or session)
+  ownerType: text("owner_type").notNull(), // "event" or "session"
+  ownerId: uuid("owner_id").notNull(),
+
+  // What it links to
+  relatedType: text("related_type").notNull(), // "event" or "session"
+  relatedId: uuid("related_id").notNull(),
+
+  sequence: integer("sequence").notNull().default(0),
+  label: text("label"), // optional custom label
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type RelatedContent = typeof relatedContent.$inferSelect;
+export type NewRelatedContent = typeof relatedContent.$inferInsert;

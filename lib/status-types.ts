@@ -4,7 +4,6 @@ export const PROCESSING_STATUSES = {
   imported: "Imported",
   queued: "Queued",
   ingesting: "Ingesting",
-  transcoded: "Transcoded",
   ready: "Ready",
   failed: "Failed",
 } as const;
@@ -20,8 +19,6 @@ export function getProcessingStatusColor(status: string | null | undefined): str
   switch (status) {
     case "ready":
       return "bg-green-100 text-green-800";
-    case "transcoded":
-      return "bg-blue-100 text-blue-800";
     case "ingesting":
     case "queued":
       return "bg-yellow-100 text-yellow-800";
