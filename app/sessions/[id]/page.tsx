@@ -11,6 +11,8 @@ import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 import { TranscriptList } from "@/components/transcript-list";
 import { SessionAssetsSection } from "@/components/session-assets-section";
 import { RelatedAssetsSection } from "@/components/related-assets-section";
+// Related content is managed at event level for MVP - sessions inherit from event
+// import { RelatedContentSection } from "@/components/related-content-section";
 import { StatusBadge } from "@/components/status-badge";
 
 export const dynamic = "force-dynamic";
@@ -94,6 +96,9 @@ export default async function SessionDetailPage({
       title: relatedAssetAlias.title,
       name: relatedAssetAlias.name,
       assetType: relatedAssetAlias.assetType,
+      fileFormat: relatedAssetAlias.fileFormat,
+      publicationStatus: relatedAssetAlias.publicationStatus,
+      processingStatus: relatedAssetAlias.processingStatus,
       relatedType: relatedAsset.relatedType,
       label: relatedAsset.label,
       sequence: relatedAsset.sequence,
@@ -109,6 +114,10 @@ export default async function SessionDetailPage({
       )
     )
     .orderBy(asc(relatedAsset.sequence));
+
+  // Note: Related content is managed at event level for MVP
+  // Sessions inherit related content from their parent event
+  // Post-MVP: session-level related content selection will be added
 
   // Get transcripts for this session with media and canonical asset info via JOINs
   const mediaAsset = aliasedTable(asset, "media_asset");
@@ -458,7 +467,10 @@ export default async function SessionDetailPage({
             }))}
           />
 
-          {/* Related Assets */}
+          {/* Related Content: Sessions inherit from event for MVP */}
+          {/* Post-MVP: Add session-level related content selection here */}
+
+          {/* Associated Media */}
           <RelatedAssetsSection
             ownerType="event_session"
             ownerId={params.id}

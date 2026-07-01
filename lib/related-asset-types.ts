@@ -2,7 +2,7 @@
 
 export const RELATED_ASSET_TYPES = {
   ephemera: "Ephemera",
-  photo: "Photo",
+  image: "Image",
   document: "Document",
   reference: "Reference",
   slide: "Slide",

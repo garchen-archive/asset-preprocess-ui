@@ -8,6 +8,7 @@ import { AsyncSearchableSelect } from "@/components/async-searchable-select";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { RELATED_ASSET_TYPE_OPTIONS, getRelatedAssetTypeLabel } from "@/lib/related-asset-types";
+import { getPublicationStatusColor, getProcessingStatusColor } from "@/lib/status-types";
 
 interface RelatedAssetLink {
   id: string; // related_asset.id
@@ -15,6 +16,9 @@ interface RelatedAssetLink {
   title: string | null;
   name: string | null;
   assetType: string | null;
+  fileFormat: string | null;
+  publicationStatus: string | null;
+  processingStatus: string | null;
   relatedType: string | null;
   label: string | null;
   sequence: number | null;
@@ -93,7 +97,7 @@ export function RelatedAssetsSection({
 
       toast({
         title: "Asset attached",
-        description: `${assetLabel || "Asset"} has been added as a related asset.`,
+        description: `${assetLabel || "Asset"} has been added as associated media.`,
       });
 
       resetForm();
@@ -140,7 +144,7 @@ export function RelatedAssetsSection({
 
       toast({
         title: "Type updated",
-        description: "Related asset type has been updated.",
+        description: "Associated media type has been updated.",
       });
 
       setEditingId(null);
@@ -211,7 +215,7 @@ export function RelatedAssetsSection({
   };
 
   const handleRemove = async (relatedAssetId: string) => {
-    if (!confirm("Remove this related asset?")) return;
+    if (!confirm("Remove this associated media?")) return;
 
     try {
       const response = await fetch("/api/pipeline", {
@@ -231,7 +235,7 @@ export function RelatedAssetsSection({
 
       toast({
         title: "Asset removed",
-        description: "Related asset has been removed.",
+        description: "Associated media has been removed.",
       });
 
       router.refresh();
@@ -248,13 +252,13 @@ export function RelatedAssetsSection({
     <div className="rounded-lg border p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Related Assets ({assets.length})</h2>
+        <h2 className="text-xl font-semibold">Associated Media ({assets.length})</h2>
         <Button
           variant="outline"
           size="sm"
           onClick={() => setIsFormOpen(!isFormOpen)}
         >
-          {isFormOpen ? "Cancel" : "Attach Related Asset"}
+          {isFormOpen ? "Cancel" : "Attach Media"}
         </Button>
       </div>
 
@@ -325,6 +329,8 @@ export function RelatedAssetsSection({
                 <th className="px-2 py-3 text-left text-sm font-medium w-12">#</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Asset</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
+                <th className="px-4 py-3 text-left text-sm font-medium w-24">Processing</th>
+                <th className="px-4 py-3 text-left text-sm font-medium w-24">Publication</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Label</th>
                 <th className="px-4 py-3 text-left text-sm font-medium w-24">Order</th>
                 <th className="px-4 py-3 text-left text-sm font-medium w-20">Actions</th>
@@ -343,9 +349,9 @@ export function RelatedAssetsSection({
                     >
                       {asset.title || asset.name || "Untitled"}
                     </Link>
-                    {asset.assetType && (
+                    {(asset.assetType || asset.fileFormat) && (
                       <span className="text-xs text-muted-foreground ml-2">
-                        ({asset.assetType})
+                        ({asset.assetType}{asset.fileFormat ? ` - ${asset.fileFormat}` : ""})
                       </span>
                     )}
                   </td>
@@ -376,6 +382,16 @@ export function RelatedAssetsSection({
                         </Badge>
                       </button>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getProcessingStatusColor(asset.processingStatus)}`}>
+                      {asset.processingStatus || "imported"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${getPublicationStatusColor(asset.publicationStatus)}`}>
+                      {asset.publicationStatus || "draft"}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">
                     {asset.label || "—"}
@@ -415,7 +431,7 @@ export function RelatedAssetsSection({
         </div>
       ) : (
         <p className="text-sm text-muted-foreground">
-          No related assets yet. Click "Add Related Asset" to attach supplemental materials.
+          No associated media yet. Click "Attach Media" to add supplemental materials.
         </p>
       )}
     </div>

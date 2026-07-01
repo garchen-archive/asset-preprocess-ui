@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset } from "@/lib/db/schema";
+import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset, relatedContent } from "@/lib/db/schema";
 import { eq, sql, inArray, asc, desc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { SortableAssetTable } from "@/components/sortable-asset-table";
 import { GenerateCollectionButton } from "@/components/generate-collection-button";
 import { EventBulkSync } from "@/components/event-bulk-sync";
 import { RelatedAssetsSection } from "@/components/related-assets-section";
+import { RelatedContentSection } from "@/components/related-content-section";
 import { StatusBadge } from "@/components/status-badge";
 import { PublishEventButton } from "@/components/publish-event-button";
 import { CmsSyncButton } from "@/components/cms-sync-button";
@@ -258,6 +259,9 @@ export default async function EventDetailPage({
       title: relatedAssetAlias.title,
       name: relatedAssetAlias.name,
       assetType: relatedAssetAlias.assetType,
+      fileFormat: relatedAssetAlias.fileFormat,
+      publicationStatus: relatedAssetAlias.publicationStatus,
+      processingStatus: relatedAssetAlias.processingStatus,
       relatedType: relatedAsset.relatedType,
       label: relatedAsset.label,
       sequence: relatedAsset.sequence,
@@ -273,6 +277,60 @@ export default async function EventDetailPage({
       )
     )
     .orderBy(asc(relatedAsset.sequence));
+
+  // Get related content (linked events/sessions)
+  const relatedEventAlias = aliasedTable(events, "related_event");
+  const relatedSessionAlias = aliasedTable(sessions, "related_session");
+  const relatedSessionEventAlias = aliasedTable(events, "related_session_event");
+
+  const relatedContentItems = await db
+    .select({
+      id: relatedContent.id,
+      relatedType: relatedContent.relatedType,
+      relatedId: relatedContent.relatedId,
+      sequence: relatedContent.sequence,
+      label: relatedContent.label,
+      // Related event fields (joined when relatedType = "event")
+      relatedEventName: relatedEventAlias.eventName,
+      relatedEventDateStart: relatedEventAlias.eventDateStart,
+      relatedEventPublicationStatus: relatedEventAlias.publicationStatus,
+      // Related session fields (joined when relatedType = "session")
+      relatedSessionName: relatedSessionAlias.sessionName,
+      relatedSessionDate: relatedSessionAlias.sessionDate,
+      relatedSessionEventName: relatedSessionEventAlias.eventName,
+      relatedSessionPublicationStatus: relatedSessionAlias.publicationStatus,
+    })
+    .from(relatedContent)
+    .leftJoin(relatedEventAlias, and(
+      eq(relatedContent.relatedType, "event"),
+      eq(relatedContent.relatedId, relatedEventAlias.id)
+    ))
+    .leftJoin(relatedSessionAlias, and(
+      eq(relatedContent.relatedType, "session"),
+      eq(relatedContent.relatedId, relatedSessionAlias.id)
+    ))
+    .leftJoin(relatedSessionEventAlias, eq(relatedSessionAlias.eventId, relatedSessionEventAlias.id))
+    .where(and(
+      eq(relatedContent.ownerType, "event"),
+      eq(relatedContent.ownerId, params.id)
+    ))
+    .orderBy(asc(relatedContent.sequence));
+
+  // Transform to component format
+  const relatedContentForComponent = relatedContentItems.map((item) => ({
+    id: item.id,
+    relatedType: item.relatedType as "event" | "session",
+    relatedId: item.relatedId,
+    relatedEventName: item.relatedEventName,
+    relatedEventDateStart: item.relatedEventDateStart,
+    relatedEventPublicationStatus: item.relatedEventPublicationStatus,
+    relatedSessionName: item.relatedSessionName,
+    relatedSessionDate: item.relatedSessionDate,
+    relatedSessionEventName: item.relatedSessionEventName,
+    relatedSessionPublicationStatus: item.relatedSessionPublicationStatus,
+    sequence: item.sequence,
+    label: item.label,
+  }));
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
@@ -791,7 +849,16 @@ export default async function EventDetailPage({
             )}
           </div>
 
-          {/* Related Assets */}
+          {/* Related Content (linked events/sessions) */}
+          <RelatedContentSection
+            ownerType="event"
+            ownerId={params.id}
+            ownerName={event.eventName}
+            items={relatedContentForComponent}
+            excludeEventId={params.id}
+          />
+
+          {/* Associated Media */}
           <RelatedAssetsSection
             ownerType="event"
             ownerId={params.id}

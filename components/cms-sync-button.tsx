@@ -87,7 +87,7 @@ export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: `/api/v1/admin/events/${eventId}/cms-sync?refresh_transcripts=true`,
+          endpoint: `/api/v1/admin/events/${eventId}/cms-sync?refresh_transcripts=true&force_update=true`,
           method: "POST",
         }),
       });

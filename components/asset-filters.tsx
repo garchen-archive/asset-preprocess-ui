@@ -38,7 +38,7 @@ const PROCESSING_STATUS_OPTIONS = [
   { value: "imported", label: "Imported" },
   { value: "queued", label: "Queued" },
   { value: "ingesting", label: "Ingesting" },
-  { value: "transcoded", label: "Transcoded" },
+  { value: "ready", label: "Ready" },
   { value: "failed", label: "Failed" },
 ];
 
