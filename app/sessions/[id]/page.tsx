@@ -10,8 +10,8 @@ import { deleteSession } from "@/lib/actions";
 import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 import { TranscriptList } from "@/components/transcript-list";
 import { SessionAssetsSection } from "@/components/session-assets-section";
-import { RelatedAssetsSection } from "@/components/related-assets-section";
-// Related content is managed at event level for MVP - sessions inherit from event
+// Associated Media and Related Content are managed at event level for MVP - sessions inherit from event
+// import { RelatedAssetsSection } from "@/components/related-assets-section";
 // import { RelatedContentSection } from "@/components/related-content-section";
 import { StatusBadge } from "@/components/status-badge";
 
@@ -87,37 +87,9 @@ export default async function SessionDetailPage({
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
     .where(eq(sessionCategories.eventSessionId, params.id));
 
-  // Get related assets for this session
-  const relatedAssetAlias = aliasedTable(asset, "related_asset_file");
-  const sessionRelatedAssets = await db
-    .select({
-      id: relatedAsset.id,
-      assetId: relatedAsset.assetId,
-      title: relatedAssetAlias.title,
-      name: relatedAssetAlias.name,
-      assetType: relatedAssetAlias.assetType,
-      fileFormat: relatedAssetAlias.fileFormat,
-      publicationStatus: relatedAssetAlias.publicationStatus,
-      processingStatus: relatedAssetAlias.processingStatus,
-      relatedType: relatedAsset.relatedType,
-      label: relatedAsset.label,
-      sequence: relatedAsset.sequence,
-    })
-    .from(relatedAsset)
-    .innerJoin(relatedAssetAlias, eq(relatedAsset.assetId, relatedAssetAlias.id))
-    .where(
-      and(
-        eq(relatedAsset.ownerType, "event_session"),
-        eq(relatedAsset.ownerId, params.id),
-        isNull(relatedAsset.deletedAt),
-        isNull(relatedAssetAlias.deletedAt)
-      )
-    )
-    .orderBy(asc(relatedAsset.sequence));
-
-  // Note: Related content is managed at event level for MVP
-  // Sessions inherit related content from their parent event
-  // Post-MVP: session-level related content selection will be added
+  // Note: Associated Media and Related Content are managed at event level for MVP
+  // Sessions inherit these from their parent event
+  // Post-MVP: session-level selection/override will be added
 
   // Get transcripts for this session with media and canonical asset info via JOINs
   const mediaAsset = aliasedTable(asset, "media_asset");
@@ -467,16 +439,8 @@ export default async function SessionDetailPage({
             }))}
           />
 
-          {/* Related Content: Sessions inherit from event for MVP */}
-          {/* Post-MVP: Add session-level related content selection here */}
-
-          {/* Associated Media */}
-          <RelatedAssetsSection
-            ownerType="event_session"
-            ownerId={params.id}
-            ownerName={session.sessionName}
-            assets={sessionRelatedAssets}
-          />
+          {/* Related Content & Associated Media: Sessions inherit from event for MVP */}
+          {/* Post-MVP: Add session-level selection/override here */}
         </div>
 
         <div className="space-y-6">
