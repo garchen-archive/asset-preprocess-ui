@@ -96,7 +96,8 @@ export function AssetCdnSync({ assetId, assetType, fileName, initialSynced = fal
       const data = await response.json();
 
       if (!response.ok || data.status >= 400) {
-        throw new Error(data.error || data.data?.error || `HTTP ${data.status}`);
+        const errorMessage = data.message || data.data?.message || data.data?.error || `HTTP ${data.status}`;
+        throw new Error(errorMessage);
       }
 
       setResult(data.data);

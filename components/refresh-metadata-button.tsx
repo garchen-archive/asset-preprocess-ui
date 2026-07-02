@@ -29,7 +29,9 @@ export function RefreshMetadataButton({ assetId }: RefreshMetadataButtonProps) {
       const result = await response.json();
 
       if (!response.ok || result.status >= 400) {
-        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+        // Handle error response: { error: true, message: "..." } or { data: { error: "...", message: "..." } }
+        const errorMessage = result.message || result.data?.message || result.data?.error || `HTTP ${result.status}`;
+        throw new Error(errorMessage);
       }
 
       const data = result.data;

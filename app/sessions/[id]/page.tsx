@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts, relatedAsset } from "@/lib/db/schema";
+import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts } from "@/lib/db/schema";
 import { eq, asc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -304,6 +304,12 @@ export default async function SessionDetailPage({
                 <dt className="text-sm font-medium text-muted-foreground">Duration (Estimated)</dt>
                 <dd className="text-sm mt-1">{session.durationEstimated || "—"}</dd>
               </div>
+              {session.sessionDescription && (
+                <div className="md:col-span-2">
+                  <dt className="text-sm font-medium text-muted-foreground">Description</dt>
+                  <dd className="text-sm mt-1">{session.sessionDescription}</dd>
+                </div>
+              )}
             </dl>
           </div>
 
@@ -340,12 +346,6 @@ export default async function SessionDetailPage({
                 </dd>
               </div>
             </div>
-            {session.sessionDescription && (
-              <div className="mt-4">
-                <dt className="text-sm font-medium text-muted-foreground">Description</dt>
-                <dd className="text-sm mt-1">{session.sessionDescription}</dd>
-              </div>
-            )}
           </div>
 
           {/* Location */}
