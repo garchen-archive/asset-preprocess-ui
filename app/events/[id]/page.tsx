@@ -957,7 +957,7 @@ export default async function EventDetailPage({
                       sessions={eventSessions.map(s => ({
                         id: s.id,
                         sessionName: s.sessionName,
-                        sessionOrder: s.sessionOrder,
+                        sessionOrder: s.sequence,
                       }))}
                       currentPosterSessionId={event.posterSessionId}
                     />
