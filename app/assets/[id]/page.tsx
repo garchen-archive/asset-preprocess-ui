@@ -15,6 +15,7 @@ import { getMuxDashboardUrl } from "@/lib/mux";
 import { StatusBadge } from "@/components/status-badge";
 import { RefreshMetadataButton } from "@/components/refresh-metadata-button";
 import { AssetCdnSync } from "@/components/asset-cdn-sync";
+import { ThumbnailTimeInput } from "@/components/thumbnail-time-input";
 
 export const dynamic = "force-dynamic";
 
@@ -128,13 +129,14 @@ export default async function AssetDetailPage({
   const hasDeliveryRef = !!deliveryRef;
 
   // Check for Mux media ref (for video/audio playback)
+  // Note: Mux refs use status="ready" when playback is available
   const [muxRef] = await db
     .select()
     .from(assetExternalRef)
     .where(and(
       eq(assetExternalRef.assetId, params.id),
       eq(assetExternalRef.provider, "mux"),
-      eq(assetExternalRef.status, "active")
+      eq(assetExternalRef.status, "ready")
     ))
     .limit(1);
 
@@ -145,6 +147,8 @@ export default async function AssetDetailPage({
     status: (muxRef.metadata as { status?: string })?.status,
     duration: (muxRef.metadata as { duration?: number })?.duration,
     aspectRatio: (muxRef.metadata as { aspect_ratio?: string })?.aspect_ratio,
+    thumbnailTime: (muxRef.metadata as { thumbnail_time?: number })?.thumbnail_time,
+    thumbnailUrl: muxRef.thumbnailUrl,
   } : null;
 
   // Build breadcrumbs
@@ -270,7 +274,47 @@ export default async function AssetDetailPage({
                       <MuxVideoPlayer
                         playbackId={playbackId}
                         title={data.title || data.name || undefined}
+                        posterUrl={muxData?.thumbnailUrl || undefined}
                       />
+                    </div>
+                  ) : null
+                }
+                thumbnailComponent={
+                  data.assetType === "video" ? (
+                    <div className="rounded-lg border p-6">
+                      <h2 className="text-xl font-semibold mb-4">Thumbnail</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Current Thumbnail */}
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Current Thumbnail</h3>
+                          {muxData?.thumbnailUrl ? (
+                            <div className="rounded-lg border overflow-hidden bg-muted/10">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={muxData.thumbnailUrl}
+                                alt="Video thumbnail"
+                                className="w-full h-auto object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-32 rounded-lg border border-dashed bg-muted/10">
+                              <span className="text-sm text-muted-foreground">No thumbnail available</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Thumbnail Time Setting */}
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground mb-2">Thumbnail Time</h3>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Set the time (in seconds) from which the thumbnail will be generated.
+                          </p>
+                          <ThumbnailTimeInput
+                            assetId={params.id}
+                            currentTime={muxData?.thumbnailTime}
+                            duration={muxData?.duration || (data.duration ? parseFloat(data.duration) : null)}
+                          />
+                        </div>
+                      </div>
                     </div>
                   ) : null
                 }

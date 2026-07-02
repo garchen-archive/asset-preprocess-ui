@@ -6,12 +6,14 @@ interface MuxVideoPlayerProps {
   playbackId: string;
   title?: string;
   accentColor?: string;
+  posterUrl?: string; // Custom poster/thumbnail image URL
 }
 
 export function MuxVideoPlayer({
   playbackId,
   title,
   accentColor = "#ec4899", // Pink to match Mux branding
+  posterUrl,
 }: MuxVideoPlayerProps) {
   if (!playbackId) {
     return (
@@ -30,6 +32,7 @@ export function MuxVideoPlayer({
         }}
         accentColor={accentColor}
         streamType="on-demand"
+        poster={posterUrl}
         style={{ width: "100%", height: "100%" }}
       />
     </div>

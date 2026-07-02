@@ -18,6 +18,7 @@ import { RelatedContentSection } from "@/components/related-content-section";
 import { StatusBadge } from "@/components/status-badge";
 import { PublishEventButton } from "@/components/publish-event-button";
 import { CmsSyncButton } from "@/components/cms-sync-button";
+import { PosterSessionSelector } from "@/components/poster-session-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -942,6 +943,29 @@ export default async function EventDetailPage({
               </div>
             </dl>
           </div>
+
+          {/* Display Settings */}
+          {eventSessions.length > 0 && (
+            <div className="rounded-lg border p-6">
+              <h2 className="text-xl font-semibold mb-4">Display Settings</h2>
+              <div className="space-y-4">
+                <div>
+                  <dt className="text-sm font-medium text-muted-foreground mb-2">Poster Session</dt>
+                  <dd>
+                    <PosterSessionSelector
+                      eventId={event.id}
+                      sessions={eventSessions.map(s => ({
+                        id: s.id,
+                        sessionName: s.sessionName,
+                        sessionOrder: s.sessionOrder,
+                      }))}
+                      currentPosterSessionId={event.posterSessionId}
+                    />
+                  </dd>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Notes */}
           {event.notes && (

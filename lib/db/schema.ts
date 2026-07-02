@@ -184,6 +184,7 @@ export const assetExternalRef = pgTable("asset_external_ref", {
   url: text("url"),
   streamUrl: text("stream_url"),
   downloadUrl: text("download_url"),
+  thumbnailUrl: text("thumbnail_url"),
 
   // Versioned metadata
   schemaVersion: text("schema_version").default("1.0"),
@@ -222,6 +223,7 @@ export const event = pgTable("event", {
   venueId: uuid("venue_id").references(() => venue.id, { onDelete: "set null" }),
   venueAddressId: uuid("venue_address_id").references(() => address.id, { onDelete: "set null" }), // DEPRECATED: Use venueId
   spaceLabel: text("space_label"), // Ad-hoc room detail (e.g., "Main Hall", "Room 201")
+  posterSessionId: uuid("poster_session_id"), // Session whose thumbnail is used as event poster
   category: text("category"), // Comma-delimited categories
   topic: text("topic"), // Comma-delimited topics
   eventDescription: text("event_description"),
