@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts } from "@/lib/db/schema";
+import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts, venue, address } from "@/lib/db/schema";
 import { eq, asc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -38,12 +38,18 @@ export default async function SessionDetailPage({
 
   const { session, event } = sessionData;
 
-  // Get location if event has one
-  const location = event?.locationId
+  // Get venue from event if it has one (includes location and address)
+  const venueData = event?.venueId
     ? await db
-        .select()
-        .from(locations)
-        .where(eq(locations.id, event.locationId))
+        .select({
+          venue: venue,
+          location: locations,
+          address: address,
+        })
+        .from(venue)
+        .leftJoin(locations, eq(venue.locationId, locations.id))
+        .leftJoin(address, eq(venue.addressId, address.id))
+        .where(eq(venue.id, event.venueId))
         .limit(1)
         .then((results) => results[0] || null)
     : null;
@@ -352,38 +358,57 @@ export default async function SessionDetailPage({
           {event && (
             <div className="rounded-lg border p-6">
               <h2 className="text-xl font-semibold mb-4">Location</h2>
-              {location ? (
+              {venueData ? (
                 <div>
                   <div className="p-4 rounded-md bg-green-50/50 border border-green-200">
                     <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-medium mb-1">
-                          <Link href={`/locations/${location.id}`} className="text-blue-600 hover:underline">
-                            {location.name}
-                          </Link>
+                      <div className="space-y-1">
+                        {/* Venue name (or location name as fallback) */}
+                        <p className="text-sm font-medium">
+                          {venueData.location ? (
+                            <Link href={`/locations/${venueData.location.id}`} className="text-blue-600 hover:underline">
+                              {venueData.venue.name || venueData.location.name}
+                            </Link>
+                          ) : (
+                            venueData.venue.name || "Unnamed venue"
+                          )}
                         </p>
-                        <p className="text-xs text-muted-foreground font-mono">{location.code}</p>
-                        {location.isOnline && (
-                          <p className="text-xs text-muted-foreground mt-1">Online</p>
+                        {/* Space label (e.g., "Main Hall") */}
+                        {venueData.venue.spaceLabel && (
+                          <p className="text-sm text-muted-foreground">{venueData.venue.spaceLabel}</p>
+                        )}
+                        {/* Address */}
+                        {venueData.address && (
+                          <p className="text-xs text-muted-foreground">
+                            {venueData.address.fullAddress || [
+                              venueData.address.city,
+                              venueData.address.stateProvince,
+                              venueData.address.country,
+                            ].filter(Boolean).join(", ")}
+                          </p>
+                        )}
+                        {/* Online indicator */}
+                        {venueData.location?.isOnline && (
+                          <p className="text-xs text-muted-foreground">Online</p>
                         )}
                       </div>
-                      {location.locationType && (
+                      {venueData.venue.venueType && (
                         <Badge variant="secondary" className="text-xs">
-                          {location.locationType}
+                          {venueData.venue.venueType}
                         </Badge>
                       )}
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t">
                     <p className="text-xs text-muted-foreground italic">
-                      Location from event: <Link href={`/events/${event.id}`} className="hover:underline text-blue-600">{event.eventName}</Link>
+                      Venue from event: <Link href={`/events/${event.id}`} className="hover:underline text-blue-600">{event.eventName}</Link>
                     </p>
                   </div>
                 </div>
               ) : (
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    No location assigned to parent event.
+                    No venue assigned to parent event.
                   </p>
                   <div className="mt-4 pt-4 border-t">
                     <p className="text-xs text-muted-foreground italic">
