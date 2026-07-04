@@ -88,7 +88,7 @@ export function AssetCdnSync({ assetId, assetType, fileName, initialSynced = fal
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: `/api/v1/assets/${assetId}/sync`,
+          endpoint: `/api/v1/assets/${assetId}/sync?target=cdn`,
           method: "POST",
         }),
       });

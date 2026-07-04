@@ -270,8 +270,8 @@ export function RelatedAssetsSection({
             <div className="flex-1 min-w-[200px]">
               <label className="text-xs font-medium text-muted-foreground mb-1 block">Asset</label>
               <AsyncSearchableSelect
-                searchEndpoint="/api/search/assets?type=non-media"
-                placeholder="Search for documents, images..."
+                searchEndpoint="/api/search/assets?type=all"
+                placeholder="Search for assets..."
                 value={assetId}
                 onChange={(value, labelText) => {
                   setAssetId(value);

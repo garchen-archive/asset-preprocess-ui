@@ -16,6 +16,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { RefreshMetadataButton } from "@/components/refresh-metadata-button";
 import { AssetCdnSync } from "@/components/asset-cdn-sync";
 import { ThumbnailTimeInput } from "@/components/thumbnail-time-input";
+import { DeletedBanner } from "@/components/deleted-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -158,6 +159,8 @@ export default async function AssetDetailPage({
 
   breadcrumbItems.push({ label: data.title || data.name || "Untitled Asset" });
 
+  const isDeleted = !!data.deletedAt;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -215,17 +218,27 @@ export default async function AssetDetailPage({
           </div>
           <p className="text-muted-foreground">{data.name}</p>
         </div>
-        <Button asChild>
-          <Link href={`/assets/${params.id}/edit`}>Edit</Link>
-        </Button>
+        {!isDeleted && (
+          <Button asChild>
+            <Link href={`/assets/${params.id}/edit`}>Edit</Link>
+          </Button>
+        )}
       </div>
+
+      {isDeleted && data.deletedAt && (
+        <DeletedBanner
+          entityType="asset"
+          entityId={params.id}
+          deletedAt={data.deletedAt}
+        />
+      )}
 
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left column - Main details */}
         <div className="lg:col-span-2 space-y-6">
           {/* CDN Delivery Section - Show for non-video/audio assets (images, documents, subtitles) */}
-          {(data.assetType === "image" || data.assetType === "document" || data.assetType === "subtitle") && (
+          {!isDeleted && (data.assetType === "image" || data.assetType === "document" || data.assetType === "subtitle") && (
             <AssetCdnSync
               assetId={params.id}
               assetType={data.assetType}
@@ -235,14 +248,25 @@ export default async function AssetDetailPage({
           )}
 
           {/* Mux Integration Section - Show for video/audio assets */}
-          {(data.assetType === "video" || data.assetType === "audio") && (() => {
+          {!isDeleted && (data.assetType === "video" || data.assetType === "audio") && (() => {
             // Use muxData from external ref (preferred) or fall back to additionalMetadata
             const playbackId = muxData?.playbackId || (data.additionalMetadata?.media_provider as { playback_id?: string })?.playback_id;
             const muxAssetId = muxData?.assetId || data.mediaProviderAssetId;
             const muxStatus = muxData?.status || (data.additionalMetadata?.media_provider as { status?: string })?.status;
             const isReady = muxStatus === "ready";
+            const isMuxSynced = !!muxData;
 
             return (
+              <>
+              {/* CDN Sync Option - Only show for video/audio when NOT synced to Mux */}
+              {!isMuxSynced && (
+                <AssetCdnSync
+                  assetId={params.id}
+                  assetType={data.assetType}
+                  fileName={data.name}
+                  initialSynced={hasDeliveryRef}
+                />
+              )}
               <AssetMuxIntegration
                 assetId={params.id}
                 assetType={data.assetType}
@@ -320,6 +344,7 @@ export default async function AssetDetailPage({
                 }
                 eventSessionId={sessionLinks.length > 0 ? sessionLinks[0].sessionId : null}
               />
+              </>
             );
           })()}
 
@@ -495,7 +520,7 @@ export default async function AssetDetailPage({
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold">Transcript Records</h2>
                 <div className="flex gap-2">
-                  {(data.assetType === "subtitle" || data.assetType === "document" ||
+                  {!isDeleted && (data.assetType === "subtitle" || data.assetType === "document" ||
                     ["srt", "vtt", "txt", "doc", "docx", "pdf"].includes(data.fileFormat || "")) && (
                     <Button size="sm" variant="outline" asChild>
                       <Link href={`/transcripts/new?canonicalAssetId=${params.id}`}>
@@ -699,7 +724,7 @@ export default async function AssetDetailPage({
                   </span>
                 )}
               </div>
-              <RefreshMetadataButton assetId={params.id} />
+              {!isDeleted && <RefreshMetadataButton assetId={params.id} />}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -777,11 +802,13 @@ export default async function AssetDetailPage({
           <div className="rounded-lg border p-6">
             <div className="flex items-start justify-between mb-4">
               <h2 className="text-xl font-semibold">Administrative</h2>
-              <Button size="sm" variant="outline" asChild>
-                <Link href={`/assets/${params.id}/edit#assignment`}>
-                  Change Assignment
-                </Link>
-              </Button>
+              {!isDeleted && (
+                <Button size="sm" variant="outline" asChild>
+                  <Link href={`/assets/${params.id}/edit#assignment`}>
+                    Change Assignment
+                  </Link>
+                </Button>
+              )}
             </div>
             <dl className="space-y-4">
               <div>
@@ -1164,20 +1191,22 @@ export default async function AssetDetailPage({
         </div>
       </div>
 
-      {/* Danger Zone */}
-      <div className="border-t pt-6">
-        <div className="rounded-lg border border-destructive/50 p-6">
-          <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Deleting this asset will permanently remove it from the database. This action cannot be undone.
-          </p>
-          <DeleteAssetButton
-            id={params.id}
-            assetType={data.assetType || undefined}
-            hasLinkedTranscripts={asCanonicalTranscripts.length > 0}
-          />
+      {/* Danger Zone - Hide for deleted items */}
+      {!isDeleted && (
+        <div className="border-t pt-6">
+          <div className="rounded-lg border border-destructive/50 p-6">
+            <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Deleting this asset will permanently remove it from the database. This action cannot be undone.
+            </p>
+            <DeleteAssetButton
+              id={params.id}
+              assetType={data.assetType || undefined}
+              hasLinkedTranscripts={asCanonicalTranscripts.length > 0}
+            />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

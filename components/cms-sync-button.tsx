@@ -32,6 +32,7 @@ interface CmsSyncStatus {
     collection_ready: boolean;
   };
   blocking?: string[];
+  warnings?: string[];
 }
 
 interface CmsSyncButtonProps {
@@ -168,7 +169,7 @@ export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
     );
   }
 
-  // Not ready - show dropdown with blocking reasons
+  // Not ready - show dropdown with blocking reasons and warnings
   if (status && !status.ready) {
     const blockingReasons = getBlockingReasons();
     return (
@@ -178,16 +179,34 @@ export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
             Sync to CMS
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-72 p-3">
+        <DropdownMenuContent align="end" className="w-80 p-3">
           <p className="font-medium text-sm mb-2">Not ready for CMS sync</p>
-          <ul className="text-sm space-y-1 mb-3">
-            {blockingReasons.map((reason, i) => (
-              <li key={i} className="text-muted-foreground flex items-start gap-2">
-                <span className="text-destructive">-</span>
-                {reason}
-              </li>
-            ))}
-          </ul>
+          {blockingReasons.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-medium text-destructive mb-1">Blocking:</p>
+              <ul className="text-sm space-y-1">
+                {blockingReasons.map((reason, i) => (
+                  <li key={i} className="text-muted-foreground flex items-start gap-2">
+                    <span className="text-destructive">✕</span>
+                    {reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {status.warnings && status.warnings.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-medium text-amber-600 mb-1">Warnings:</p>
+              <ul className="text-sm space-y-1">
+                {status.warnings.map((warning, i) => (
+                  <li key={i} className="text-muted-foreground flex items-start gap-2">
+                    <span className="text-amber-500">⚠</span>
+                    {warning}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p className="text-xs text-muted-foreground border-t pt-2">
             Click "Publish All" first to publish all content.
           </p>
@@ -213,26 +232,41 @@ export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
                 This will prepare and sync English content for <strong>"{eventName}"</strong> to the public CMS.
               </p>
               {status && (
-                <div className="rounded-md border p-3 bg-muted/50">
-                  <p className="text-sm font-medium mb-2">Content to sync:</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Sessions:</span>
-                      <Badge variant="secondary">{status.checks.sessions_published.total}</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Assets:</span>
-                      <Badge variant="secondary">{status.checks.assets_published.total}</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Transcripts:</span>
-                      <Badge variant="secondary">{status.checks.transcripts_published.total}</Badge>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Collection:</span>
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">Ready</Badge>
+                <div className="space-y-3">
+                  <div className="rounded-md border p-3 bg-muted/50">
+                    <p className="text-sm font-medium mb-2">Content to sync:</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Sessions:</span>
+                        <Badge variant="secondary">{status.checks.sessions_published.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Assets:</span>
+                        <Badge variant="secondary">{status.checks.assets_published.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Transcripts:</span>
+                        <Badge variant="secondary">{status.checks.transcripts_published.total}</Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Collection:</span>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">Ready</Badge>
+                      </div>
                     </div>
                   </div>
+                  {status.warnings && status.warnings.length > 0 && (
+                    <div className="rounded-md border border-amber-200 p-3 bg-amber-50">
+                      <p className="text-sm font-medium text-amber-800 mb-2">Warnings (non-blocking):</p>
+                      <ul className="text-sm space-y-1">
+                        {status.warnings.map((warning, i) => (
+                          <li key={i} className="text-amber-700 flex items-start gap-2">
+                            <span>⚠</span>
+                            {warning}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

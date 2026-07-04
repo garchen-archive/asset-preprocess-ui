@@ -14,6 +14,7 @@ import { SessionAssetsSection } from "@/components/session-assets-section";
 // import { RelatedAssetsSection } from "@/components/related-assets-section";
 // import { RelatedContentSection } from "@/components/related-content-section";
 import { StatusBadge } from "@/components/status-badge";
+import { DeletedBanner } from "@/components/deleted-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export default async function SessionDetailPage({
 }: {
   params: { id: string };
 }) {
+  // Allow viewing deleted items (will show deleted banner)
   const [sessionData] = await db
     .select({
       session: sessions,
@@ -29,7 +31,7 @@ export default async function SessionDetailPage({
     })
     .from(sessions)
     .leftJoin(events, eq(sessions.eventId, events.id))
-    .where(and(eq(sessions.id, params.id), isNull(sessions.deletedAt)))
+    .where(eq(sessions.id, params.id))
     .limit(1);
 
   if (!sessionData) {
@@ -246,6 +248,8 @@ export default async function SessionDetailPage({
 
   breadcrumbItems.push({ label: session.sessionName });
 
+  const isDeleted = !!session.deletedAt;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -253,10 +257,20 @@ export default async function SessionDetailPage({
           <Breadcrumbs items={breadcrumbItems} />
           <h1 className="text-3xl font-bold">{session.sessionName}</h1>
         </div>
-        <Button asChild>
-          <Link href={`/sessions/${params.id}/edit`}>Edit</Link>
-        </Button>
+        {!isDeleted && (
+          <Button asChild>
+            <Link href={`/sessions/${params.id}/edit`}>Edit</Link>
+          </Button>
+        )}
       </div>
+
+      {isDeleted && session.deletedAt && (
+        <DeletedBanner
+          entityType="session"
+          entityId={params.id}
+          deletedAt={session.deletedAt}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -543,7 +557,8 @@ export default async function SessionDetailPage({
             </div>
           )}
 
-          {/* Danger Zone */}
+          {/* Danger Zone - Hide for deleted items */}
+          {!isDeleted && (
           <div className="rounded-lg border border-destructive/50 p-6">
             <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
             <p className="text-sm text-muted-foreground mb-4">
@@ -557,6 +572,7 @@ export default async function SessionDetailPage({
               </Button>
             </form>
           </div>
+          )}
         </div>
       </div>
     </div>

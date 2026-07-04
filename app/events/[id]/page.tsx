@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { PublishEventButton } from "@/components/publish-event-button";
 import { CmsSyncButton } from "@/components/cms-sync-button";
 import { PosterSessionSelector } from "@/components/poster-session-selector";
+import { DeletedBanner } from "@/components/deleted-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -347,6 +348,8 @@ export default async function EventDetailPage({
 
   breadcrumbItems.push({ label: event.eventName });
 
+  const isDeleted = !!event.deletedAt;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -354,21 +357,31 @@ export default async function EventDetailPage({
           <Breadcrumbs items={breadcrumbItems} />
           <h1 className="text-3xl font-bold">{event.eventName}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <PublishEventButton
-            eventId={params.id}
-            eventName={event.eventName}
-            sessionCount={eventSessions.length}
-          />
-          <CmsSyncButton
-            eventId={params.id}
-            eventName={event.eventName}
-          />
-          <Button asChild>
-            <Link href={`/events/${params.id}/edit`}>Edit</Link>
-          </Button>
-        </div>
+        {!isDeleted && (
+          <div className="flex items-center gap-2">
+            <PublishEventButton
+              eventId={params.id}
+              eventName={event.eventName}
+              sessionCount={eventSessions.length}
+            />
+            <CmsSyncButton
+              eventId={params.id}
+              eventName={event.eventName}
+            />
+            <Button asChild>
+              <Link href={`/events/${params.id}/edit`}>Edit</Link>
+            </Button>
+          </div>
+        )}
       </div>
+
+      {isDeleted && event.deletedAt && (
+        <DeletedBanner
+          entityType="event"
+          entityId={params.id}
+          deletedAt={event.deletedAt}
+        />
+      )}
 
       {/* Parent Event Badge */}
       {parentEvent && (
@@ -1025,33 +1038,35 @@ export default async function EventDetailPage({
             );
           })()}
 
-          {/* Danger Zone */}
-          <div className="rounded-lg border border-destructive/50 p-6">
-            <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Unpublish this event and all its sessions, assets, and transcripts.
-                </p>
-                <PublishEventButton
-                  eventId={params.id}
-                  eventName={event.eventName}
-                  sessionCount={eventSessions.length}
-                  variant="unpublish"
-                />
-              </div>
-              <div className="border-t pt-4">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Deleting this event will also delete all associated sessions.
-                </p>
-                <form action={deleteEvent.bind(null, params.id)}>
-                  <Button type="submit" variant="destructive" size="sm">
-                    Delete Event
-                  </Button>
-                </form>
+          {/* Danger Zone - Hide for deleted items */}
+          {!isDeleted && (
+            <div className="rounded-lg border border-destructive/50 p-6">
+              <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Unpublish this event and all its sessions, assets, and transcripts.
+                  </p>
+                  <PublishEventButton
+                    eventId={params.id}
+                    eventName={event.eventName}
+                    sessionCount={eventSessions.length}
+                    variant="unpublish"
+                  />
+                </div>
+                <div className="border-t pt-4">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Deleting this event will also delete all associated sessions.
+                  </p>
+                  <form action={deleteEvent.bind(null, params.id)}>
+                    <Button type="submit" variant="destructive" size="sm">
+                      Delete Event
+                    </Button>
+                  </form>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
