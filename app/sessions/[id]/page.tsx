@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
-import { deleteSession } from "@/lib/actions";
+import { DeleteSessionButton } from "@/components/delete-session-button";
 import { CanonicalAssetSelector } from "@/components/canonical-asset-selector";
 import { TranscriptList } from "@/components/transcript-list";
 import { SessionAssetsSection } from "@/components/session-assets-section";
@@ -562,15 +562,13 @@ export default async function SessionDetailPage({
           <div className="rounded-lg border border-destructive/50 p-6">
             <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Deleting this session cannot be undone.
+              Soft delete marks the session as deleted but allows restoration. Permanent delete removes it from the database entirely.
             </p>
-            <form action={deleteSession}>
-              <input type="hidden" name="id" value={params.id} />
-              <input type="hidden" name="redirectTo" value="/sessions" />
-              <Button type="submit" variant="destructive" size="sm">
-                Delete Session
-              </Button>
-            </form>
+            <DeleteSessionButton
+              id={params.id}
+              sessionName={session.sessionName}
+              assetCount={session.assetCount || 0}
+            />
           </div>
           )}
         </div>

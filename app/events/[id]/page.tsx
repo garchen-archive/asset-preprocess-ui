@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs, BreadcrumbItem } from "@/components/breadcrumbs";
 import { notFound } from "next/navigation";
-import { deleteEvent } from "@/lib/actions";
+import { DeleteEventButton } from "@/components/delete-event-button";
 import { formatDate, getDateMeta, type DateMeta } from "@/lib/utils";
 import { BulkAddSessionsButton } from "@/components/bulk-add-sessions-modal";
 import { SessionSequenceEditor, SessionRowActions } from "@/components/session-sequence-editor";
@@ -1056,13 +1056,13 @@ export default async function EventDetailPage({
                 </div>
                 <div className="border-t pt-4">
                   <p className="text-sm text-muted-foreground mb-2">
-                    Deleting this event will also delete all associated sessions.
+                    Soft delete marks the event as deleted but allows restoration. Permanent delete removes it from the database entirely.
                   </p>
-                  <form action={deleteEvent.bind(null, params.id)}>
-                    <Button type="submit" variant="destructive" size="sm">
-                      Delete Event
-                    </Button>
-                  </form>
+                  <DeleteEventButton
+                    id={params.id}
+                    eventName={event.eventName}
+                    sessionCount={eventSessions.length}
+                  />
                 </div>
               </div>
             </div>

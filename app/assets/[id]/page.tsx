@@ -1197,7 +1197,7 @@ export default async function AssetDetailPage({
           <div className="rounded-lg border border-destructive/50 p-6">
             <h2 className="text-xl font-semibold mb-2 text-destructive">Danger Zone</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              Deleting this asset will permanently remove it from the database. This action cannot be undone.
+              Soft delete marks the asset as deleted but allows restoration. Permanent delete removes it from the database entirely.
             </p>
             <DeleteAssetButton
               id={params.id}

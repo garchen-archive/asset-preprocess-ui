@@ -38,6 +38,7 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
   const [cascadeTranscripts, setCascadeTranscripts] = useState(true);
   const [cascadeMuxTracks, setCascadeMuxTracks] = useState(true);
   const [deleteMux, setDeleteMux] = useState(false);
+  const [deleteMode, setDeleteMode] = useState<"soft" | "hard">("soft");
   const router = useRouter();
 
   // Check if this is an SRT/VTT asset that might have linked transcripts
@@ -76,10 +77,15 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
     startTransition(async () => {
       try {
         // Build query params
-        const params = new URLSearchParams({ hard: "true" });
+        const params = new URLSearchParams();
 
-        // Add cascade option if transcripts exist
-        if (preview?.transcripts?.length && cascadeTranscripts) {
+        // Only add hard=true for permanent deletion
+        if (deleteMode === "hard") {
+          params.set("hard", "true");
+        }
+
+        // Add cascade option if transcripts exist (only for hard delete)
+        if (deleteMode === "hard" && preview?.transcripts?.length && cascadeTranscripts) {
           if (cascadeMuxTracks) {
             params.set("cascade", "full");
           } else {
@@ -87,16 +93,17 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
           }
         }
 
-        // Add delete_mux for video assets
-        if (deleteMux && preview?.asset?.has_mux_asset) {
+        // Add delete_mux for video assets (only for hard delete)
+        if (deleteMode === "hard" && deleteMux && preview?.asset?.has_mux_asset) {
           params.set("delete_mux", "true");
         }
 
+        const queryString = params.toString();
         const response = await fetch(`/api/pipeline`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            endpoint: `/api/v1/assets/${id}?${params.toString()}`,
+            endpoint: `/api/v1/assets/${id}${queryString ? `?${queryString}` : ""}`,
             method: "DELETE",
           }),
         });
@@ -107,8 +114,14 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
           throw new Error(data.error || data.data?.message || "Failed to delete asset");
         }
 
-        router.push("/assets");
-        router.refresh();
+        if (deleteMode === "soft") {
+          // Stay on page, refresh to show deleted banner
+          router.refresh();
+        } else {
+          // Hard delete - go back to assets list
+          router.push("/assets");
+          router.refresh();
+        }
       } catch (err: any) {
         setError(err.message || "Failed to delete asset");
         setShowConfirm(false);
@@ -148,6 +161,41 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
           <p className="text-sm text-muted-foreground">Loading preview...</p>
         ) : preview ? (
           <div className="space-y-3">
+            {/* Delete mode selection */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Delete mode:</p>
+              <div className="space-y-1">
+                <label className="flex items-start gap-2 text-sm cursor-pointer p-2 rounded border hover:bg-muted/50 has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    value="soft"
+                    checked={deleteMode === "soft"}
+                    onChange={() => setDeleteMode("soft")}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <span className="font-medium">Soft delete</span>
+                    <p className="text-xs text-muted-foreground">Mark as deleted. Can be restored later.</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 text-sm cursor-pointer p-2 rounded border hover:bg-muted/50 has-[:checked]:border-destructive has-[:checked]:bg-destructive/10">
+                  <input
+                    type="radio"
+                    name="deleteMode"
+                    value="hard"
+                    checked={deleteMode === "hard"}
+                    onChange={() => setDeleteMode("hard")}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <span className="font-medium text-destructive">Permanent delete</span>
+                    <p className="text-xs text-muted-foreground">Permanently remove from database. Cannot be undone.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             {/* Warnings */}
             {preview.warnings && preview.warnings.length > 0 && (
               <div className="p-2 bg-amber-50 border border-amber-200 rounded text-sm">
@@ -157,7 +205,7 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
               </div>
             )}
 
-            {/* Linked transcripts */}
+            {/* Linked transcripts - only show cascade options for hard delete */}
             {preview.transcripts && preview.transcripts.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">
@@ -179,35 +227,37 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
                   ))}
                 </div>
 
-                {/* Cascade options */}
-                <div className="pt-2 space-y-2">
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={cascadeTranscripts}
-                      onChange={(e) => setCascadeTranscripts(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>Also delete linked transcript records</span>
-                  </label>
-
-                  {cascadeTranscripts && preview.transcripts.some((t) => t.has_mux_track) && (
-                    <label className="flex items-center gap-2 text-sm cursor-pointer pl-6">
+                {/* Cascade options - only for hard delete */}
+                {deleteMode === "hard" && (
+                  <div className="pt-2 space-y-2">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={cascadeMuxTracks}
-                        onChange={(e) => setCascadeMuxTracks(e.target.checked)}
+                        checked={cascadeTranscripts}
+                        onChange={(e) => setCascadeTranscripts(e.target.checked)}
                         className="rounded"
                       />
-                      <span>Also delete Mux subtitle tracks</span>
+                      <span>Also delete linked transcript records</span>
                     </label>
-                  )}
-                </div>
+
+                    {cascadeTranscripts && preview.transcripts.some((t) => t.has_mux_track) && (
+                      <label className="flex items-center gap-2 text-sm cursor-pointer pl-6">
+                        <input
+                          type="checkbox"
+                          checked={cascadeMuxTracks}
+                          onChange={(e) => setCascadeMuxTracks(e.target.checked)}
+                          className="rounded"
+                        />
+                        <span>Also delete Mux subtitle tracks</span>
+                      </label>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Mux video asset option */}
-            {preview.asset?.has_mux_asset && (
+            {/* Mux video asset option - only for hard delete */}
+            {deleteMode === "hard" && preview.asset?.has_mux_asset && (
               <div className="pt-2 border-t">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
@@ -228,12 +278,12 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
         <div className="flex gap-2 pt-2">
           <Button
             type="button"
-            variant="destructive"
+            variant={deleteMode === "hard" ? "destructive" : "default"}
             size="sm"
             onClick={handleDelete}
             disabled={isPending || loadingPreview}
           >
-            {isPending ? "Deleting..." : "Delete"}
+            {isPending ? "Deleting..." : deleteMode === "hard" ? "Permanently Delete" : "Soft Delete"}
           </Button>
           <Button
             type="button"
@@ -242,6 +292,7 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
             onClick={() => {
               setShowConfirm(false);
               setPreview(null);
+              setDeleteMode("soft");
             }}
             disabled={isPending}
           >
@@ -254,26 +305,64 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
 
   // Simple confirmation for regular assets
   return (
-    <div className="flex gap-2 items-center">
-      <span className="text-sm text-destructive font-medium">Are you sure?</span>
-      <Button
-        type="button"
-        variant="destructive"
-        size="sm"
-        onClick={handleDelete}
-        disabled={isPending}
-      >
-        {isPending ? "Deleting..." : "Yes, Delete"}
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => setShowConfirm(false)}
-        disabled={isPending}
-      >
-        Cancel
-      </Button>
+    <div className="space-y-3 p-4 border border-destructive/50 rounded-lg bg-destructive/5">
+      <p className="text-sm font-medium">Delete this asset?</p>
+
+      {/* Delete mode selection */}
+      <div className="space-y-1">
+        <label className="flex items-start gap-2 text-sm cursor-pointer p-2 rounded border hover:bg-muted/50 has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
+          <input
+            type="radio"
+            name="deleteModeSimple"
+            value="soft"
+            checked={deleteMode === "soft"}
+            onChange={() => setDeleteMode("soft")}
+            className="mt-0.5"
+          />
+          <div>
+            <span className="font-medium">Soft delete</span>
+            <p className="text-xs text-muted-foreground">Mark as deleted. Can be restored later.</p>
+          </div>
+        </label>
+        <label className="flex items-start gap-2 text-sm cursor-pointer p-2 rounded border hover:bg-muted/50 has-[:checked]:border-destructive has-[:checked]:bg-destructive/10">
+          <input
+            type="radio"
+            name="deleteModeSimple"
+            value="hard"
+            checked={deleteMode === "hard"}
+            onChange={() => setDeleteMode("hard")}
+            className="mt-0.5"
+          />
+          <div>
+            <span className="font-medium text-destructive">Permanent delete</span>
+            <p className="text-xs text-muted-foreground">Permanently remove from database. Cannot be undone.</p>
+          </div>
+        </label>
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <Button
+          type="button"
+          variant={deleteMode === "hard" ? "destructive" : "default"}
+          size="sm"
+          onClick={handleDelete}
+          disabled={isPending}
+        >
+          {isPending ? "Deleting..." : deleteMode === "hard" ? "Permanently Delete" : "Soft Delete"}
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setShowConfirm(false);
+            setDeleteMode("soft");
+          }}
+          disabled={isPending}
+        >
+          Cancel
+        </Button>
+      </div>
     </div>
   );
 }

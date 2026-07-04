@@ -34,12 +34,12 @@ export function DeletedBanner({
 
     setIsRestoring(true);
     try {
-      // Map entity type to API endpoint
+      // Map entity type to restore API endpoint (POST to /restore)
       const endpointMap: Record<string, string> = {
-        asset: `/api/v1/assets/${entityId}`,
-        event: `/api/v1/admin/events/${entityId}`,
-        session: `/api/v1/admin/sessions/${entityId}`,
-        transcript: `/api/v1/admin/transcripts/${entityId}`,
+        asset: `/api/v1/assets/${entityId}/restore`,
+        event: `/api/v1/admin/events/${entityId}/restore`,
+        session: `/api/v1/admin/sessions/${entityId}/restore`,
+        transcript: `/api/v1/transcripts/${entityId}/restore`,
       };
 
       const response = await fetch("/api/pipeline", {
@@ -47,10 +47,7 @@ export function DeletedBanner({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           endpoint: endpointMap[entityType],
-          method: "PATCH",
-          data: {
-            deleted_at: null,
-          },
+          method: "POST",
         }),
       });
 

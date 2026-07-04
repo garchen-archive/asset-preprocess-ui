@@ -1,11 +1,14 @@
 // Related asset type display labels and utilities
+// These types must match the pipeline's determineRelatedType() in cmssync/prep.go
 
 export const RELATED_ASSET_TYPES = {
-  ephemera: "Ephemera",
+  audio: "Audio",
+  video: "Video",
   image: "Image",
+  pdf: "PDF",
   document: "Document",
-  reference: "Reference",
   slide: "Slide",
+  reference: "Reference",
   other: "Other",
 } as const;
 
