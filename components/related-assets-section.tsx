@@ -10,6 +10,53 @@ import { useRouter } from "next/navigation";
 import { RELATED_ASSET_TYPE_OPTIONS, getRelatedAssetTypeLabel } from "@/lib/related-asset-types";
 import { getPublicationStatusColor, getProcessingStatusColor } from "@/lib/status-types";
 
+// Icon components for asset types
+function AssetTypeIcon({ assetType, fileFormat }: { assetType: string | null; fileFormat: string | null }) {
+  const type = assetType?.toLowerCase() || fileFormat?.toLowerCase() || "";
+
+  if (type.includes("video")) {
+    return (
+      <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+    );
+  }
+  if (type.includes("audio")) {
+    return (
+      <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+      </svg>
+    );
+  }
+  if (type.includes("pdf") || type.includes("document")) {
+    return (
+      <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
+  }
+  if (type.includes("subtitle") || type.includes("vtt") || type.includes("srt")) {
+    return (
+      <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+      </svg>
+    );
+  }
+  if (type.includes("image") || type.includes("png") || type.includes("jpg") || type.includes("jpeg")) {
+    return (
+      <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+  }
+  // Default file icon
+  return (
+    <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
 interface RelatedAssetLink {
   id: string; // related_asset.id
   assetId: string;
@@ -19,6 +66,7 @@ interface RelatedAssetLink {
   fileFormat: string | null;
   publicationStatus: string | null;
   processingStatus: string | null;
+  thumbnailUrl: string | null;
   relatedType: string | null;
   label: string | null;
   sequence: number | null;
@@ -225,9 +273,9 @@ export function RelatedAssetsSection({
     const currentAsset = sortedAssets[currentIndex];
     const swapAsset = sortedAssets[swapIndex];
 
-    // Swap sequences using individual PATCH calls
-    const currentNewSeq = swapAsset.sequence ?? swapIndex;
-    const swapNewSeq = currentAsset.sequence ?? currentIndex;
+    // Use array indices for sequences to ensure they're always unique
+    const currentNewSeq = swapIndex;
+    const swapNewSeq = currentIndex;
 
     try {
       // Update both assets' sequences
@@ -383,8 +431,8 @@ export function RelatedAssetsSection({
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-2 py-3 text-left text-sm font-medium w-12">#</th>
+                <th className="px-2 py-3 text-left text-sm font-medium w-20">Media</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Asset</th>
-                <th className="px-4 py-3 text-left text-sm font-medium">Type</th>
                 <th className="px-4 py-3 text-left text-sm font-medium w-24">Processing</th>
                 <th className="px-4 py-3 text-left text-sm font-medium w-24">Publication</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Label</th>
@@ -398,6 +446,47 @@ export function RelatedAssetsSection({
                   <td className="px-2 py-3 text-sm text-center text-muted-foreground">
                     {(asset.sequence ?? index) + 1}
                   </td>
+                  <td className="px-2 py-3">
+                    <div className="flex flex-col items-center gap-1">
+                      {asset.thumbnailUrl ? (
+                        <img
+                          src={asset.thumbnailUrl}
+                          alt=""
+                          className="w-14 h-10 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-14 h-10 bg-muted rounded flex items-center justify-center">
+                          <AssetTypeIcon assetType={asset.assetType} fileFormat={asset.fileFormat} />
+                        </div>
+                      )}
+                      {editingId === asset.id ? (
+                        <select
+                          value={asset.relatedType || "other"}
+                          onChange={(e) => handleRelatedTypeChange(asset.id, e.target.value)}
+                          onBlur={() => setEditingId(null)}
+                          disabled={isUpdating}
+                          autoFocus
+                          className="text-xs border rounded px-1 py-0.5 bg-background w-full"
+                        >
+                          {RELATED_ASSET_TYPE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <button
+                          onClick={() => setEditingId(asset.id)}
+                          className="hover:bg-muted rounded px-1 py-0.5 transition-colors"
+                          title="Click to edit type"
+                        >
+                          <Badge variant="outline" className="text-xs cursor-pointer">
+                            {getRelatedAssetTypeLabel(asset.relatedType) || "Other"}
+                          </Badge>
+                        </button>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <Link
                       href={`/assets/${asset.assetId}`}
@@ -409,34 +498,6 @@ export function RelatedAssetsSection({
                       <span className="text-xs text-muted-foreground ml-2">
                         ({asset.assetType}{asset.fileFormat ? ` - ${asset.fileFormat}` : ""})
                       </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {editingId === asset.id ? (
-                      <select
-                        value={asset.relatedType || "other"}
-                        onChange={(e) => handleRelatedTypeChange(asset.id, e.target.value)}
-                        onBlur={() => setEditingId(null)}
-                        disabled={isUpdating}
-                        autoFocus
-                        className="text-xs border rounded px-1 py-0.5 bg-background"
-                      >
-                        {RELATED_ASSET_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <button
-                        onClick={() => setEditingId(asset.id)}
-                        className="hover:bg-muted rounded px-1 py-0.5 transition-colors"
-                        title="Click to edit type"
-                      >
-                        <Badge variant="outline" className="text-xs cursor-pointer">
-                          {getRelatedAssetTypeLabel(asset.relatedType) || "Other"}
-                        </Badge>
-                      </button>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">

@@ -9,6 +9,23 @@ import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
 import { getPublicationStatusColor } from "@/lib/status-types";
 
+// Icon for event/session types
+function ContentTypeIcon({ type }: { type: "event" | "session" }) {
+  if (type === "event") {
+    return (
+      <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+    );
+  }
+  // Session icon
+  return (
+    <svg className="w-6 h-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
 interface RelatedContentItem {
   id: string;
   relatedType: "event" | "session";
@@ -22,6 +39,7 @@ interface RelatedContentItem {
   relatedSessionPublicationStatus?: string | null;
   sequence: number;
   label: string | null;
+  thumbnailUrl?: string | null;
 }
 
 interface RelatedContentSectionProps {
@@ -138,6 +156,10 @@ export function RelatedContentSection({
     const currentItem = sortedItems[currentIndex];
     const swapItem = sortedItems[swapIndex];
 
+    // Use array indices for sequences to ensure they're always unique
+    const currentNewSeq = swapIndex;
+    const swapNewSeq = currentIndex;
+
     try {
       const [res1, res2] = await Promise.all([
         fetch("/api/pipeline", {
@@ -146,7 +168,7 @@ export function RelatedContentSection({
           body: JSON.stringify({
             endpoint: `/api/v1/admin/related-content/${currentItem.id}`,
             method: "PATCH",
-            data: { sequence: swapItem.sequence },
+            data: { sequence: currentNewSeq },
           }),
         }),
         fetch("/api/pipeline", {
@@ -155,7 +177,7 @@ export function RelatedContentSection({
           body: JSON.stringify({
             endpoint: `/api/v1/admin/related-content/${swapItem.id}`,
             method: "PATCH",
-            data: { sequence: currentItem.sequence },
+            data: { sequence: swapNewSeq },
           }),
         }),
       ]);
@@ -372,7 +394,7 @@ export function RelatedContentSection({
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="px-2 py-3 text-left text-sm font-medium w-12">#</th>
-                <th className="px-4 py-3 text-left text-sm font-medium w-20">Type</th>
+                <th className="px-2 py-3 text-left text-sm font-medium w-20"></th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Name</th>
                 <th className="px-4 py-3 text-left text-sm font-medium w-24">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-medium">Label</th>
@@ -388,10 +410,23 @@ export function RelatedContentSection({
                     <td className="px-2 py-3 text-sm text-center text-muted-foreground">
                       {index + 1}
                     </td>
-                    <td className="px-4 py-3 text-sm">
-                      <Badge variant="outline" className="text-xs">
-                        {item.relatedType === "event" ? "Event" : "Session"}
-                      </Badge>
+                    <td className="px-2 py-3">
+                      <div className="flex flex-col items-center gap-1">
+                        {item.thumbnailUrl ? (
+                          <img
+                            src={item.thumbnailUrl}
+                            alt=""
+                            className="w-14 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-14 h-10 bg-muted rounded flex items-center justify-center">
+                            <ContentTypeIcon type={item.relatedType} />
+                          </div>
+                        )}
+                        <Badge variant="outline" className="text-xs">
+                          {item.relatedType === "event" ? "Event" : "Session"}
+                        </Badge>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <Link

@@ -17,6 +17,8 @@ interface AssetLink {
   assetType: string | null;
   duration: string | null;
   catalogingStatus: string | null;
+  processingStatus: string | null;
+  publicationStatus: string | null;
   variantType: string;
   variantLabel: string | null;
   isCanonical: boolean;

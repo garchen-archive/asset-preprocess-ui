@@ -446,6 +446,8 @@ export default async function SessionDetailPage({
               assetType: link.asset.assetType,
               duration: link.asset.duration,
               catalogingStatus: link.asset.catalogingStatus,
+              processingStatus: link.asset.processingStatus,
+              publicationStatus: link.asset.publicationStatus,
               variantType: link.variantType,
               variantLabel: link.variantLabel,
               isCanonical: link.linkId === canonicalAssetId,
