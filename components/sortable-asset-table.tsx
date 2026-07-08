@@ -5,6 +5,11 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getVariantLabel, VARIANT_TYPE_OPTIONS } from "@/lib/variant-types";
+import { InlineLocaleSelector } from "@/components/inline-locale-selector";
+import {
+  getProcessingStatusLabel,
+  getPublicationStatusLabel,
+} from "@/lib/status-types";
 
 type AssetRow = {
   id: string;
@@ -14,11 +19,49 @@ type AssetRow = {
   assetType: string | null;
   duration: string | null;
   catalogingStatus: string | null;
+  processingStatus: string | null;
+  publicationStatus?: string | null;
   eventSessionId?: string | null;
   variantType?: string | null;
   variantLabel?: string | null;
   isCanonical?: boolean | null;
+  primaryLocale?: string | null;
 };
+
+// Compact dot colors for processing status
+function getProcessingDotColor(status: string | null | undefined): string {
+  switch (status) {
+    case "ready":
+      return "bg-green-500";
+    case "ingesting":
+    case "queued":
+      return "bg-yellow-500";
+    case "failed":
+      return "bg-red-500";
+    case "imported":
+    default:
+      return "bg-gray-400";
+  }
+}
+
+// Compact dot colors for publication status
+function getPublicationDotColor(status: string | null | undefined): string {
+  switch (status) {
+    case "published":
+      return "bg-green-500";
+    case "approved":
+      return "bg-blue-500";
+    case "in_review":
+      return "bg-yellow-500";
+    case "needs_work":
+      return "bg-orange-500";
+    case "archived":
+      return "bg-gray-500";
+    case "draft":
+    default:
+      return "bg-gray-400";
+  }
+}
 
 type Session = {
   id: string;
@@ -30,6 +73,7 @@ interface SortableAssetTableProps {
   sessions?: Session[];
   showSessionColumn?: boolean;
   showVariantColumn?: boolean;
+  showLocaleColumn?: boolean;
   tableId: string; // Used to namespace sort params (e.g., "direct" or "session")
   onVariantChange?: (linkId: string, newVariantType: string) => Promise<void>;
 }
@@ -39,6 +83,7 @@ export function SortableAssetTable({
   sessions = [],
   showSessionColumn = false,
   showVariantColumn = false,
+  showLocaleColumn = false,
   tableId,
   onVariantChange,
 }: SortableAssetTableProps) {
@@ -88,6 +133,10 @@ export function SortableAssetTable({
       case "variant":
         aVal = a.variantLabel || a.variantType || "";
         bVal = b.variantLabel || b.variantType || "";
+        break;
+      case "locale":
+        aVal = a.primaryLocale || "";
+        bVal = b.primaryLocale || "";
         break;
       default:
         aVal = a.title || a.name || "";
@@ -150,6 +199,9 @@ export function SortableAssetTable({
             {showVariantColumn && (
               <SortableHeader column="variant">Variant</SortableHeader>
             )}
+            {showLocaleColumn && (
+              <SortableHeader column="locale">Lang</SortableHeader>
+            )}
             <SortableHeader column="status">Status</SortableHeader>
             <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
           </tr>
@@ -160,12 +212,17 @@ export function SortableAssetTable({
             return (
               <tr key={asset.id} className="border-b hover:bg-muted/50">
                 <td className="px-4 py-3 text-sm">
-                  <Link
-                    href={`/assets/${asset.id}`}
-                    className="font-medium text-blue-600 hover:underline"
-                  >
-                    {asset.title || asset.name || "Untitled"}
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/assets/${asset.id}`}
+                      className="font-medium text-blue-600 hover:underline"
+                    >
+                      {asset.title || asset.name || "Untitled"}
+                    </Link>
+                    {asset.isCanonical && (
+                      <Badge className="bg-green-100 text-green-800 text-xs">Canonical</Badge>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm">{asset.assetType || "—"}</td>
                 <td className="px-4 py-3 text-sm">{asset.duration || "—"}</td>
@@ -185,60 +242,67 @@ export function SortableAssetTable({
                 )}
                 {showVariantColumn && (
                   <td className="px-4 py-3 text-sm">
-                    <div className="flex items-center gap-1">
-                      {asset.isCanonical && (
-                        <Badge className="bg-green-100 text-green-800 text-xs">Canonical</Badge>
-                      )}
-                      {onVariantChange && asset.linkId ? (
-                        editingLinkId === asset.linkId ? (
-                          <select
-                            value={asset.variantType || "source"}
-                            onChange={async (e) => {
-                              setIsUpdating(true);
-                              await onVariantChange(asset.linkId!, e.target.value);
-                              setEditingLinkId(null);
-                              setIsUpdating(false);
-                            }}
-                            onBlur={() => setEditingLinkId(null)}
-                            disabled={isUpdating}
-                            autoFocus
-                            className="text-xs border rounded px-1 py-0.5 bg-background"
-                          >
-                            {VARIANT_TYPE_OPTIONS.map((vt) => (
-                              <option key={vt.value} value={vt.value}>
-                                {vt.label}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <button
-                            onClick={() => setEditingLinkId(asset.linkId!)}
-                            className="hover:bg-muted rounded px-1 py-0.5 transition-colors"
-                            title="Click to edit variant type"
-                          >
-                            <Badge variant="outline" className="text-xs cursor-pointer">
-                              {asset.variantLabel || getVariantLabel(asset.variantType) || "source"}
-                            </Badge>
-                          </button>
-                        )
-                      ) : asset.variantLabel || asset.variantType ? (
-                        <Badge variant="outline" className="text-xs">
-                          {asset.variantLabel || getVariantLabel(asset.variantType)}
-                        </Badge>
+                    {onVariantChange && asset.linkId ? (
+                      editingLinkId === asset.linkId ? (
+                        <select
+                          value={asset.variantType || "source"}
+                          onChange={async (e) => {
+                            setIsUpdating(true);
+                            await onVariantChange(asset.linkId!, e.target.value);
+                            setEditingLinkId(null);
+                            setIsUpdating(false);
+                          }}
+                          onBlur={() => setEditingLinkId(null)}
+                          disabled={isUpdating}
+                          autoFocus
+                          className="text-xs border rounded px-1 py-0.5 bg-background"
+                        >
+                          {VARIANT_TYPE_OPTIONS.map((vt) => (
+                            <option key={vt.value} value={vt.value}>
+                              {vt.label}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        !asset.isCanonical && "—"
-                      )}
-                    </div>
+                        <button
+                          onClick={() => setEditingLinkId(asset.linkId!)}
+                          className="hover:bg-muted rounded px-1 py-0.5 transition-colors"
+                          title="Click to edit variant type"
+                        >
+                          <Badge variant="outline" className="text-xs cursor-pointer">
+                            {asset.variantLabel || getVariantLabel(asset.variantType) || "Source"}
+                          </Badge>
+                        </button>
+                      )
+                    ) : asset.variantLabel || asset.variantType ? (
+                      <Badge variant="outline" className="text-xs">
+                        {asset.variantLabel || getVariantLabel(asset.variantType)}
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                )}
+                {showLocaleColumn && (
+                  <td className="px-4 py-3 text-sm">
+                    <InlineLocaleSelector
+                      assetId={asset.id}
+                      currentLocale={asset.primaryLocale}
+                      compact
+                    />
                   </td>
                 )}
                 <td className="px-4 py-3 text-sm">
-                  {asset.catalogingStatus ? (
-                    <Badge variant="outline" className="text-xs">
-                      {asset.catalogingStatus}
-                    </Badge>
-                  ) : (
-                    "—"
-                  )}
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${getProcessingDotColor(asset.processingStatus)}`}
+                      title={`Processing: ${getProcessingStatusLabel(asset.processingStatus)}`}
+                    />
+                    <div
+                      className={`w-2.5 h-2.5 rounded-full ${getPublicationDotColor(asset.publicationStatus)}`}
+                      title={`Publication: ${getPublicationStatusLabel(asset.publicationStatus)}`}
+                    />
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <Link

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db/client";
-import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset, relatedContent } from "@/lib/db/schema";
-import { eq, sql, inArray, asc, desc, and, isNull, aliasedTable } from "drizzle-orm";
+import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset, relatedContent, assetExternalRef } from "@/lib/db/schema";
+import { eq, sql, inArray, asc, desc, and, isNull, isNotNull, aliasedTable } from "drizzle-orm";
+import { getPresignedUrl } from "@/lib/storage/backblaze";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +78,8 @@ export default async function EventDetailPage({
       duration: archiveAssets.duration,
       eventSessionId: archiveAssets.eventSessionId,
       catalogingStatus: archiveAssets.catalogingStatus,
+      processingStatus: archiveAssets.processingStatus,
+      publicationStatus: archiveAssets.publicationStatus,
     })
     .from(archiveAssets)
     .where(eq(archiveAssets.eventId, params.id))
@@ -95,6 +98,8 @@ export default async function EventDetailPage({
           duration: asset.duration,
           eventSessionId: eventSessionAsset.eventSessionId,
           catalogingStatus: asset.catalogingStatus,
+          processingStatus: asset.processingStatus,
+          publicationStatus: asset.publicationStatus,
           variantType: eventSessionAsset.variantType,
           variantLabel: eventSessionAsset.variantLabel,
         })
@@ -254,7 +259,8 @@ export default async function EventDetailPage({
 
   // Get related assets for this event
   const relatedAssetAlias = aliasedTable(asset, "related_asset_file");
-  const eventRelatedAssets = await db
+  const relatedAssetRefAlias = aliasedTable(assetExternalRef, "related_asset_ref");
+  const eventRelatedAssetsRaw = await db
     .select({
       id: relatedAsset.id,
       assetId: relatedAsset.assetId,
@@ -264,12 +270,23 @@ export default async function EventDetailPage({
       fileFormat: relatedAssetAlias.fileFormat,
       publicationStatus: relatedAssetAlias.publicationStatus,
       processingStatus: relatedAssetAlias.processingStatus,
+      // Get thumbnail from external ref (Backblaze downloadUrl for images, or thumbnailUrl for videos)
+      externalThumbnailUrl: relatedAssetRefAlias.thumbnailUrl,
+      externalDownloadUrl: relatedAssetRefAlias.downloadUrl,
+      externalId: relatedAssetRefAlias.externalId,
+      externalProvider: relatedAssetRefAlias.provider,
+      externalProviderCategory: relatedAssetRefAlias.providerCategory,
       relatedType: relatedAsset.relatedType,
       label: relatedAsset.label,
       sequence: relatedAsset.sequence,
     })
     .from(relatedAsset)
     .innerJoin(relatedAssetAlias, eq(relatedAsset.assetId, relatedAssetAlias.id))
+    // Join to external refs - prefer delivery refs for images (Backblaze CDN)
+    .leftJoin(relatedAssetRefAlias, and(
+      eq(relatedAsset.assetId, relatedAssetRefAlias.assetId),
+      eq(relatedAssetRefAlias.status, "active")
+    ))
     .where(
       and(
         eq(relatedAsset.ownerType, "event"),
@@ -280,10 +297,104 @@ export default async function EventDetailPage({
     )
     .orderBy(asc(relatedAsset.sequence));
 
+  // First pass: deduplicate and identify items that need presigned URLs
+  const eventRelatedAssetsMap = new Map<string, {
+    id: string;
+    assetId: string;
+    title: string | null;
+    name: string | null;
+    assetType: string | null;
+    fileFormat: string | null;
+    publicationStatus: string | null;
+    processingStatus: string | null;
+    thumbnailUrl: string | null;
+    backblazeKey: string | null; // File key for presigned URL generation
+    relatedType: string | null;
+    label: string | null;
+    sequence: number | null;
+  }>();
+
+  for (const item of eventRelatedAssetsRaw) {
+    const existing = eventRelatedAssetsMap.get(item.id);
+
+    // Check if this is an image asset
+    const isImage = item.assetType?.toLowerCase().includes('image') ||
+                    ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(item.fileFormat?.toLowerCase() || '');
+    const isBackblazeDelivery = item.externalProvider === 'backblaze' && item.externalProviderCategory === 'delivery';
+
+    // For images with Backblaze delivery refs, we'll use the externalId to generate a presigned URL
+    let thumbnailUrl: string | null = null;
+    let backblazeKey: string | null = null;
+
+    if (isImage && isBackblazeDelivery && item.externalId) {
+      // Will generate presigned URL later
+      backblazeKey = item.externalId;
+    } else if (item.externalThumbnailUrl) {
+      thumbnailUrl = item.externalThumbnailUrl;
+    }
+
+    // Prefer Backblaze delivery refs for images, keep version with a thumbnail otherwise
+    const isBetterMatch = !existing ||
+      (!existing.thumbnailUrl && !existing.backblazeKey && (thumbnailUrl || backblazeKey)) ||
+      (isImage && isBackblazeDelivery && item.externalId);
+
+    if (isBetterMatch) {
+      eventRelatedAssetsMap.set(item.id, {
+        id: item.id,
+        assetId: item.assetId,
+        title: item.title,
+        name: item.name,
+        assetType: item.assetType,
+        fileFormat: item.fileFormat,
+        publicationStatus: item.publicationStatus,
+        processingStatus: item.processingStatus,
+        thumbnailUrl,
+        backblazeKey,
+        relatedType: item.relatedType,
+        label: item.label,
+        sequence: item.sequence,
+      });
+    }
+  }
+
+  // Generate presigned URLs for items with backblazeKey
+  const assetsNeedingPresignedUrls = Array.from(eventRelatedAssetsMap.values())
+    .filter(a => a.backblazeKey && !a.thumbnailUrl);
+
+  if (assetsNeedingPresignedUrls.length > 0) {
+    const presignedUrlPromises = assetsNeedingPresignedUrls.map(async (asset) => {
+      try {
+        const url = await getPresignedUrl(asset.backblazeKey!, 3600, true);
+        return { id: asset.id, url };
+      } catch (error) {
+        console.error(`Failed to generate presigned URL for ${asset.backblazeKey}:`, error);
+        return { id: asset.id, url: null };
+      }
+    });
+
+    const presignedResults = await Promise.all(presignedUrlPromises);
+    for (const { id, url } of presignedResults) {
+      const asset = eventRelatedAssetsMap.get(id);
+      if (asset && url) {
+        asset.thumbnailUrl = url;
+      }
+    }
+  }
+
+  // Remove backblazeKey from final output (it was only for internal use)
+  const eventRelatedAssets = Array.from(eventRelatedAssetsMap.values()).map(({ backblazeKey, ...rest }) => rest);
+
   // Get related content (linked events/sessions)
   const relatedEventAlias = aliasedTable(events, "related_event");
   const relatedSessionAlias = aliasedTable(sessions, "related_session");
   const relatedSessionEventAlias = aliasedTable(events, "related_session_event");
+  // For event thumbnails: event → posterSession → canonicalAssetLink → asset → externalRef
+  const eventPosterSessionAlias = aliasedTable(sessions, "event_poster_session");
+  const eventPosterAssetLinkAlias = aliasedTable(eventSessionAsset, "event_poster_asset_link");
+  const eventPosterAssetRefAlias = aliasedTable(assetExternalRef, "event_poster_asset_ref");
+  // For session thumbnails: session → canonicalAssetLink → asset → externalRef
+  const sessionCanonicalAssetLinkAlias = aliasedTable(eventSessionAsset, "session_canonical_asset_link");
+  const sessionCanonicalAssetRefAlias = aliasedTable(assetExternalRef, "session_canonical_asset_ref");
 
   const relatedContentItems = await db
     .select({
@@ -296,43 +407,85 @@ export default async function EventDetailPage({
       relatedEventName: relatedEventAlias.eventName,
       relatedEventDateStart: relatedEventAlias.eventDateStart,
       relatedEventPublicationStatus: relatedEventAlias.publicationStatus,
+      relatedEventThumbnailUrl: eventPosterAssetRefAlias.thumbnailUrl,
       // Related session fields (joined when relatedType = "session")
       relatedSessionName: relatedSessionAlias.sessionName,
       relatedSessionDate: relatedSessionAlias.sessionDate,
       relatedSessionEventName: relatedSessionEventAlias.eventName,
       relatedSessionPublicationStatus: relatedSessionAlias.publicationStatus,
+      relatedSessionThumbnailUrl: sessionCanonicalAssetRefAlias.thumbnailUrl,
     })
     .from(relatedContent)
     .leftJoin(relatedEventAlias, and(
       eq(relatedContent.relatedType, "event"),
       eq(relatedContent.relatedId, relatedEventAlias.id)
     ))
+    // Event thumbnail chain: event → posterSession → canonicalAssetLink → externalRef (with thumbnail)
+    .leftJoin(eventPosterSessionAlias, eq(relatedEventAlias.posterSessionId, eventPosterSessionAlias.id))
+    .leftJoin(eventPosterAssetLinkAlias, eq(eventPosterSessionAlias.canonicalEventSessionAssetId, eventPosterAssetLinkAlias.id))
+    .leftJoin(eventPosterAssetRefAlias, and(
+      eq(eventPosterAssetLinkAlias.assetId, eventPosterAssetRefAlias.assetId),
+      isNotNull(eventPosterAssetRefAlias.thumbnailUrl)
+    ))
     .leftJoin(relatedSessionAlias, and(
       eq(relatedContent.relatedType, "session"),
       eq(relatedContent.relatedId, relatedSessionAlias.id)
     ))
     .leftJoin(relatedSessionEventAlias, eq(relatedSessionAlias.eventId, relatedSessionEventAlias.id))
+    // Session thumbnail chain: session → canonicalAssetLink → externalRef (with thumbnail)
+    .leftJoin(sessionCanonicalAssetLinkAlias, eq(relatedSessionAlias.canonicalEventSessionAssetId, sessionCanonicalAssetLinkAlias.id))
+    .leftJoin(sessionCanonicalAssetRefAlias, and(
+      eq(sessionCanonicalAssetLinkAlias.assetId, sessionCanonicalAssetRefAlias.assetId),
+      isNotNull(sessionCanonicalAssetRefAlias.thumbnailUrl)
+    ))
     .where(and(
       eq(relatedContent.ownerType, "event"),
       eq(relatedContent.ownerId, params.id)
     ))
     .orderBy(asc(relatedContent.sequence));
 
-  // Transform to component format
-  const relatedContentForComponent = relatedContentItems.map((item) => ({
-    id: item.id,
-    relatedType: item.relatedType as "event" | "session",
-    relatedId: item.relatedId,
-    relatedEventName: item.relatedEventName,
-    relatedEventDateStart: item.relatedEventDateStart,
-    relatedEventPublicationStatus: item.relatedEventPublicationStatus,
-    relatedSessionName: item.relatedSessionName,
-    relatedSessionDate: item.relatedSessionDate,
-    relatedSessionEventName: item.relatedSessionEventName,
-    relatedSessionPublicationStatus: item.relatedSessionPublicationStatus,
-    sequence: item.sequence,
-    label: item.label,
-  }));
+  // Transform to component format and deduplicate (multiple external refs can cause duplicates)
+  const relatedContentMap = new Map<string, {
+    id: string;
+    relatedType: "event" | "session";
+    relatedId: string;
+    relatedEventName: string | null;
+    relatedEventDateStart: string | null;
+    relatedEventPublicationStatus: string | null;
+    relatedSessionName: string | null;
+    relatedSessionDate: string | null;
+    relatedSessionEventName: string | null;
+    relatedSessionPublicationStatus: string | null;
+    sequence: number;
+    label: string | null;
+    thumbnailUrl: string | null;
+  }>();
+
+  for (const item of relatedContentItems) {
+    const thumbnailUrl = item.relatedEventThumbnailUrl || item.relatedSessionThumbnailUrl || null;
+    const existing = relatedContentMap.get(item.id);
+
+    // Keep the version with a thumbnail, or first occurrence if neither has one
+    if (!existing || (!existing.thumbnailUrl && thumbnailUrl)) {
+      relatedContentMap.set(item.id, {
+        id: item.id,
+        relatedType: item.relatedType as "event" | "session",
+        relatedId: item.relatedId,
+        relatedEventName: item.relatedEventName,
+        relatedEventDateStart: item.relatedEventDateStart,
+        relatedEventPublicationStatus: item.relatedEventPublicationStatus,
+        relatedSessionName: item.relatedSessionName,
+        relatedSessionDate: item.relatedSessionDate,
+        relatedSessionEventName: item.relatedSessionEventName,
+        relatedSessionPublicationStatus: item.relatedSessionPublicationStatus,
+        sequence: item.sequence,
+        label: item.label,
+        thumbnailUrl,
+      });
+    }
+  }
+
+  const relatedContentForComponent = Array.from(relatedContentMap.values());
 
   // Build breadcrumbs
   const breadcrumbItems: BreadcrumbItem[] = [
