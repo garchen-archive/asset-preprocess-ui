@@ -20,6 +20,7 @@ interface AssetLink {
   variantType: string;
   variantLabel: string | null;
   isCanonical: boolean;
+  primaryLocale: string | null;
 }
 
 interface SessionAssetsSectionProps {
@@ -242,6 +243,7 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
         <SortableAssetTable
           assets={assets}
           showVariantColumn
+          showLocaleColumn
           tableId="assets"
           onVariantChange={handleVariantChange}
         />

@@ -449,6 +449,7 @@ export default async function SessionDetailPage({
               variantType: link.variantType,
               variantLabel: link.variantLabel,
               isCanonical: link.linkId === canonicalAssetId,
+              primaryLocale: link.asset.primaryLocale,
             }))}
           />
 

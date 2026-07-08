@@ -43,7 +43,7 @@ export const asset = pgTable("asset_legacy", {
   fileSizeMb: real("file_size_mb"),
   duration: text("duration"),
   durationSeconds: integer("duration_seconds"),
-  language: text("language"),
+  primaryLocale: text("primary_locale"), // e.g., "en", "bo", "zh" - primary language of the content
 
   // 2. CONTENT
   title: text("title"),

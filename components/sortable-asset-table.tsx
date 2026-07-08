@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getVariantLabel, VARIANT_TYPE_OPTIONS } from "@/lib/variant-types";
+import { InlineLocaleSelector } from "@/components/inline-locale-selector";
 
 type AssetRow = {
   id: string;
@@ -18,6 +19,7 @@ type AssetRow = {
   variantType?: string | null;
   variantLabel?: string | null;
   isCanonical?: boolean | null;
+  primaryLocale?: string | null;
 };
 
 type Session = {
@@ -30,6 +32,7 @@ interface SortableAssetTableProps {
   sessions?: Session[];
   showSessionColumn?: boolean;
   showVariantColumn?: boolean;
+  showLocaleColumn?: boolean;
   tableId: string; // Used to namespace sort params (e.g., "direct" or "session")
   onVariantChange?: (linkId: string, newVariantType: string) => Promise<void>;
 }
@@ -39,6 +42,7 @@ export function SortableAssetTable({
   sessions = [],
   showSessionColumn = false,
   showVariantColumn = false,
+  showLocaleColumn = false,
   tableId,
   onVariantChange,
 }: SortableAssetTableProps) {
@@ -88,6 +92,10 @@ export function SortableAssetTable({
       case "variant":
         aVal = a.variantLabel || a.variantType || "";
         bVal = b.variantLabel || b.variantType || "";
+        break;
+      case "locale":
+        aVal = a.primaryLocale || "";
+        bVal = b.primaryLocale || "";
         break;
       default:
         aVal = a.title || a.name || "";
@@ -149,6 +157,9 @@ export function SortableAssetTable({
             )}
             {showVariantColumn && (
               <SortableHeader column="variant">Variant</SortableHeader>
+            )}
+            {showLocaleColumn && (
+              <SortableHeader column="locale">Lang</SortableHeader>
             )}
             <SortableHeader column="status">Status</SortableHeader>
             <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
@@ -229,6 +240,15 @@ export function SortableAssetTable({
                         !asset.isCanonical && "—"
                       )}
                     </div>
+                  </td>
+                )}
+                {showLocaleColumn && (
+                  <td className="px-4 py-3 text-sm">
+                    <InlineLocaleSelector
+                      assetId={asset.id}
+                      currentLocale={asset.primaryLocale}
+                      compact
+                    />
                   </td>
                 )}
                 <td className="px-4 py-3 text-sm">

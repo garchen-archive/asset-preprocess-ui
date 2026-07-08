@@ -31,6 +31,8 @@ interface RelatedAssetsSectionProps {
   assets: RelatedAssetLink[];
 }
 
+const MAX_ITEMS = 6;
+
 export function RelatedAssetsSection({
   ownerType,
   ownerId,
@@ -44,6 +46,8 @@ export function RelatedAssetsSection({
   const [label, setLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -55,8 +59,19 @@ export function RelatedAssetsSection({
     return seqA - seqB;
   });
 
+  const isAtLimit = assets.length >= MAX_ITEMS;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isAtLimit) {
+      toast({
+        title: "Limit reached",
+        description: `Maximum of ${MAX_ITEMS} associated media items allowed per event`,
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (!assetId) {
       toast({
@@ -119,6 +134,46 @@ export function RelatedAssetsSection({
     setAssetLabel("");
     setRelatedType("document");
     setLabel("");
+  };
+
+  const handleLabelChange = async (relatedAssetId: string, newLabel: string) => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/related-assets/${relatedAssetId}`,
+          method: "PATCH",
+          data: {
+            label: newLabel || null,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Label updated",
+        description: "Associated media label has been updated.",
+      });
+
+      setEditingLabelId(null);
+      setEditingLabelValue("");
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update label",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
   const handleRelatedTypeChange = async (relatedAssetId: string, newRelatedType: string) => {
@@ -257,8 +312,9 @@ export function RelatedAssetsSection({
           variant="outline"
           size="sm"
           onClick={() => setIsFormOpen(!isFormOpen)}
+          disabled={isAtLimit && !isFormOpen}
         >
-          {isFormOpen ? "Cancel" : "Attach Media"}
+          {isFormOpen ? "Cancel" : isAtLimit ? `Limit (${MAX_ITEMS})` : "Attach Media"}
         </Button>
       </div>
 
@@ -393,8 +449,48 @@ export function RelatedAssetsSection({
                       {asset.publicationStatus || "draft"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {asset.label || "—"}
+                  <td className="px-4 py-3 text-sm">
+                    {editingLabelId === asset.id ? (
+                      <input
+                        type="text"
+                        value={editingLabelValue}
+                        onChange={(e) => setEditingLabelValue(e.target.value)}
+                        onBlur={() => {
+                          if (!isUpdating) {
+                            if (editingLabelValue !== (asset.label || "")) {
+                              handleLabelChange(asset.id, editingLabelValue);
+                            } else {
+                              setEditingLabelId(null);
+                              setEditingLabelValue("");
+                            }
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleLabelChange(asset.id, editingLabelValue);
+                          } else if (e.key === "Escape") {
+                            setEditingLabelId(null);
+                            setEditingLabelValue("");
+                          }
+                        }}
+                        disabled={isUpdating}
+                        autoFocus
+                        placeholder="Enter label..."
+                        className="text-xs border rounded px-2 py-1 bg-background w-24"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingLabelId(asset.id);
+                          setEditingLabelValue(asset.label || "");
+                        }}
+                        className="hover:bg-muted rounded px-1 py-0.5 transition-colors text-muted-foreground"
+                        title="Click to edit label"
+                      >
+                        {asset.label || "—"}
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <div className="flex items-center gap-1">

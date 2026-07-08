@@ -36,6 +36,10 @@ export async function updateAsset(id: string, formData: FormData) {
   const description = formData.get("descriptionSummary") as string;
   if (description) updateRequest.description = description;
 
+  // Primary locale (language)
+  const primaryLocale = formData.get("primaryLocale") as string;
+  updateRequest.primary_locale = primaryLocale || null;
+
   // Build metadata for curation fields
   const metadata: Record<string, any> = { curation: {} };
 

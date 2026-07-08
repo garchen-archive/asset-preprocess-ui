@@ -47,6 +47,9 @@ export function RelatedContentSection({
   const [relatedLabel, setRelatedLabel] = useState("");
   const [customLabel, setCustomLabel] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editingLabelValue, setEditingLabelValue] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -205,6 +208,46 @@ export function RelatedContentSection({
         description: error instanceof Error ? error.message : "Failed to remove content",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleLabelChange = async (itemId: string, newLabel: string) => {
+    setIsUpdating(true);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/related-content/${itemId}`,
+          method: "PATCH",
+          data: {
+            label: newLabel || null,
+          },
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Label updated",
+        description: "Related content label has been updated.",
+      });
+
+      setEditingLabelId(null);
+      setEditingLabelValue("");
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update label",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -368,8 +411,48 @@ export function RelatedContentSection({
                         {display.publicationStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {item.label || "—"}
+                    <td className="px-4 py-3 text-sm">
+                      {editingLabelId === item.id ? (
+                        <input
+                          type="text"
+                          value={editingLabelValue}
+                          onChange={(e) => setEditingLabelValue(e.target.value)}
+                          onBlur={() => {
+                            if (!isUpdating) {
+                              if (editingLabelValue !== (item.label || "")) {
+                                handleLabelChange(item.id, editingLabelValue);
+                              } else {
+                                setEditingLabelId(null);
+                                setEditingLabelValue("");
+                              }
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleLabelChange(item.id, editingLabelValue);
+                            } else if (e.key === "Escape") {
+                              setEditingLabelId(null);
+                              setEditingLabelValue("");
+                            }
+                          }}
+                          disabled={isUpdating}
+                          autoFocus
+                          placeholder="Enter label..."
+                          className="text-xs border rounded px-2 py-1 bg-background w-28"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setEditingLabelId(item.id);
+                            setEditingLabelValue(item.label || "");
+                          }}
+                          className="hover:bg-muted rounded px-1 py-0.5 transition-colors text-muted-foreground"
+                          title="Click to edit label"
+                        >
+                          {item.label || "—"}
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <div className="flex items-center gap-1">

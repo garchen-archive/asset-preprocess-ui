@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { EventOrSessionSelect } from "@/components/event-or-session-select";
 import { updateAsset } from "@/lib/actions";
 import { BackblazeLink } from "@/components/backblaze-link";
+import { SUPPORTED_LOCALES } from "@/lib/locales";
 
 export const dynamic = "force-dynamic";
 
@@ -229,6 +230,23 @@ export default async function AssetEditPage({
                 defaultValue={data.category || ""}
                 placeholder="e.g., Teaching, Practice, Q&A"
               />
+            </div>
+
+            <div>
+              <Label htmlFor="primaryLocale">Primary Language</Label>
+              <select
+                id="primaryLocale"
+                name="primaryLocale"
+                defaultValue={data.primaryLocale || ""}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">Not specified</option>
+                {SUPPORTED_LOCALES.map((locale) => (
+                  <option key={locale.value} value={locale.value}>
+                    {locale.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="md:col-span-2">

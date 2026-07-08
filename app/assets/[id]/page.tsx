@@ -17,6 +17,7 @@ import { RefreshMetadataButton } from "@/components/refresh-metadata-button";
 import { AssetCdnSync } from "@/components/asset-cdn-sync";
 import { ThumbnailTimeInput } from "@/components/thumbnail-time-input";
 import { DeletedBanner } from "@/components/deleted-banner";
+import { InlineLocaleSelector } from "@/components/inline-locale-selector";
 
 export const dynamic = "force-dynamic";
 
@@ -216,7 +217,15 @@ export default async function AssetDetailPage({
             </div>
             <h1 className="text-3xl font-bold">{data.title || data.name || "Untitled Asset"}</h1>
           </div>
-          <p className="text-muted-foreground">{data.name}</p>
+          <div className="flex items-center gap-3">
+            <p className="text-muted-foreground">{data.name}</p>
+            {!isDeleted && (
+              <InlineLocaleSelector
+                assetId={params.id}
+                currentLocale={data.primaryLocale}
+              />
+            )}
+          </div>
         </div>
         {!isDeleted && (
           <Button asChild>
