@@ -247,7 +247,14 @@ export default async function AssetDetailPage({
         {/* Left column - Main details */}
         <div className="lg:col-span-2 space-y-6">
           {/* CDN Delivery Section - Show for non-video/audio assets (images, documents, subtitles) */}
-          {!isDeleted && (data.assetType === "image" || data.assetType === "document" || data.assetType === "subtitle") && (
+          {!isDeleted && (
+            data.assetType === "image" ||
+            data.assetType === "document" ||
+            data.assetType === "subtitle" ||
+            data.assetType === "picture" ||
+            // Also check file format for image types that might not have assetType set correctly
+            ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff"].includes(data.fileFormat?.toLowerCase() || "")
+          ) && (
             <AssetCdnSync
               assetId={params.id}
               assetType={data.assetType}

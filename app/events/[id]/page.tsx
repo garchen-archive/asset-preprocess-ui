@@ -298,6 +298,7 @@ export default async function EventDetailPage({
     .orderBy(asc(relatedAsset.sequence));
 
   // First pass: deduplicate and identify items that need presigned URLs
+  // Also track CDN delivery status for each asset
   const eventRelatedAssetsMap = new Map<string, {
     id: string;
     assetId: string;
@@ -309,6 +310,7 @@ export default async function EventDetailPage({
     processingStatus: string | null;
     thumbnailUrl: string | null;
     backblazeKey: string | null; // File key for presigned URL generation
+    hasCdnDelivery: boolean; // Whether asset has CDN delivery ref (Backblaze) or Mux media ref
     relatedType: string | null;
     label: string | null;
     sequence: number | null;
@@ -321,6 +323,10 @@ export default async function EventDetailPage({
     const isImage = item.assetType?.toLowerCase().includes('image') ||
                     ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(item.fileFormat?.toLowerCase() || '');
     const isBackblazeDelivery = item.externalProvider === 'backblaze' && item.externalProviderCategory === 'delivery';
+    const isMuxMedia = item.externalProvider === 'mux' && item.externalProviderCategory === 'media';
+
+    // Asset is CDN-ready if it has Backblaze delivery OR Mux media ref
+    const hasCdnDelivery = isBackblazeDelivery || isMuxMedia;
 
     // For images with Backblaze delivery refs, we'll use the externalId to generate a presigned URL
     let thumbnailUrl: string | null = null;
@@ -333,10 +339,10 @@ export default async function EventDetailPage({
       thumbnailUrl = item.externalThumbnailUrl;
     }
 
-    // Prefer Backblaze delivery refs for images, keep version with a thumbnail otherwise
+    // Prefer entries with CDN delivery, then those with thumbnails
     const isBetterMatch = !existing ||
-      (!existing.thumbnailUrl && !existing.backblazeKey && (thumbnailUrl || backblazeKey)) ||
-      (isImage && isBackblazeDelivery && item.externalId);
+      (!existing.hasCdnDelivery && hasCdnDelivery) ||
+      (!existing.thumbnailUrl && !existing.backblazeKey && (thumbnailUrl || backblazeKey));
 
     if (isBetterMatch) {
       eventRelatedAssetsMap.set(item.id, {
@@ -350,6 +356,7 @@ export default async function EventDetailPage({
         processingStatus: item.processingStatus,
         thumbnailUrl,
         backblazeKey,
+        hasCdnDelivery: existing?.hasCdnDelivery || hasCdnDelivery, // Keep true if any ref has CDN
         relatedType: item.relatedType,
         label: item.label,
         sequence: item.sequence,
@@ -383,6 +390,12 @@ export default async function EventDetailPage({
 
   // Remove backblazeKey from final output (it was only for internal use)
   const eventRelatedAssets = Array.from(eventRelatedAssetsMap.values()).map(({ backblazeKey, ...rest }) => rest);
+
+  // Compute CDN sync stats for related assets
+  const relatedAssetsCdnStats = {
+    total: eventRelatedAssets.length,
+    synced: eventRelatedAssets.filter(a => a.hasCdnDelivery).length,
+  };
 
   // Get related content (linked events/sessions)
   const relatedEventAlias = aliasedTable(events, "related_event");
@@ -520,6 +533,7 @@ export default async function EventDetailPage({
             <CmsSyncButton
               eventId={params.id}
               eventName={event.eventName}
+              relatedAssetsCdnStats={relatedAssetsCdnStats}
             />
             <Button asChild>
               <Link href={`/events/${params.id}/edit`}>Edit</Link>

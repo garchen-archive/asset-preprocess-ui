@@ -67,6 +67,7 @@ interface RelatedAssetLink {
   publicationStatus: string | null;
   processingStatus: string | null;
   thumbnailUrl: string | null;
+  hasCdnDelivery: boolean; // Whether asset is synced to CDN (Backblaze or Mux)
   relatedType: string | null;
   label: string | null;
   sequence: number | null;
@@ -108,6 +109,10 @@ export function RelatedAssetsSection({
   });
 
   const isAtLimit = assets.length >= MAX_ITEMS;
+
+  // CDN sync stats
+  const cdnSyncedCount = assets.filter(a => a.hasCdnDelivery).length;
+  const allSyncedToCdn = assets.length > 0 && cdnSyncedCount === assets.length;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -355,7 +360,22 @@ export function RelatedAssetsSection({
     <div className="rounded-lg border p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">Associated Media ({assets.length})</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-semibold">Associated Media ({assets.length})</h2>
+          {assets.length > 0 && (
+            <span
+              className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                allSyncedToCdn
+                  ? "bg-green-100 text-green-700"
+                  : "bg-amber-100 text-amber-700"
+              }`}
+              title={allSyncedToCdn ? "All assets synced to CDN" : `${cdnSyncedCount}/${assets.length} synced to CDN`}
+            >
+              <span className={`w-2 h-2 rounded-full ${allSyncedToCdn ? "bg-green-500" : "bg-amber-500"}`} />
+              {allSyncedToCdn ? "CDN Ready" : `${cdnSyncedCount}/${assets.length} CDN`}
+            </span>
+          )}
+        </div>
         <Button
           variant="outline"
           size="sm"
@@ -448,17 +468,27 @@ export function RelatedAssetsSection({
                   </td>
                   <td className="px-2 py-3">
                     <div className="flex flex-col items-center gap-1">
-                      {asset.thumbnailUrl ? (
-                        <img
-                          src={asset.thumbnailUrl}
-                          alt=""
-                          className="w-14 h-10 object-cover rounded"
+                      {/* Thumbnail with CDN status indicator */}
+                      <div className="relative">
+                        {asset.thumbnailUrl ? (
+                          <img
+                            src={asset.thumbnailUrl}
+                            alt=""
+                            className="w-14 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-14 h-10 bg-muted rounded flex items-center justify-center">
+                            <AssetTypeIcon assetType={asset.assetType} fileFormat={asset.fileFormat} />
+                          </div>
+                        )}
+                        {/* CDN status indicator */}
+                        <span
+                          className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-white ${
+                            asset.hasCdnDelivery ? "bg-green-500" : "bg-amber-500"
+                          }`}
+                          title={asset.hasCdnDelivery ? "Synced to CDN" : "Not synced to CDN"}
                         />
-                      ) : (
-                        <div className="w-14 h-10 bg-muted rounded flex items-center justify-center">
-                          <AssetTypeIcon assetType={asset.assetType} fileFormat={asset.fileFormat} />
-                        </div>
-                      )}
+                      </div>
                       {editingId === asset.id ? (
                         <select
                           value={asset.relatedType || "other"}
