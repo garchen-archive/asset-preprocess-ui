@@ -128,9 +128,10 @@ export function AssetCdnSync({ assetId, assetType, fileName, initialSynced = fal
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 B";
+    if (bytes < 0 || !isFinite(bytes)) return "Unknown";
     const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
@@ -164,7 +165,9 @@ export function AssetCdnSync({ assetId, assetType, fileName, initialSynced = fal
         <div>
           <h2 className="text-xl font-semibold">CDN Delivery</h2>
           <p className="text-sm text-muted-foreground">
-            {result ? `Synced to ${result.provider}` : `Sync this ${assetType || "asset"} to Backblaze CDN for public delivery`}
+            {result
+              ? `Synced to ${result.provider}`
+              : `Move this ${assetType || "asset"} to CDN delivery path for public access`}
           </p>
         </div>
         <Button

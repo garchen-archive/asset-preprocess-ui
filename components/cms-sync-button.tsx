@@ -38,9 +38,14 @@ interface CmsSyncStatus {
 interface CmsSyncButtonProps {
   eventId: string;
   eventName: string;
+  /** CDN sync status for related assets (associated media) */
+  relatedAssetsCdnStats?: {
+    total: number;
+    synced: number;
+  };
 }
 
-export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
+export function CmsSyncButton({ eventId, eventName, relatedAssetsCdnStats }: CmsSyncButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -141,6 +146,11 @@ export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
     if (!status.checks.collection_ready) {
       reasons.push("No published collection");
     }
+    // Check related assets CDN status (passed from server component)
+    if (relatedAssetsCdnStats && relatedAssetsCdnStats.synced < relatedAssetsCdnStats.total) {
+      const unsynced = relatedAssetsCdnStats.total - relatedAssetsCdnStats.synced;
+      reasons.push(`${unsynced} associated media not synced to CDN`);
+    }
     return reasons;
   };
 
@@ -169,8 +179,12 @@ export function CmsSyncButton({ eventId, eventName }: CmsSyncButtonProps) {
     );
   }
 
+  // Check if related assets CDN sync is incomplete (from server component)
+  const hasUnsyncedRelatedAssets = relatedAssetsCdnStats &&
+    relatedAssetsCdnStats.synced < relatedAssetsCdnStats.total;
+
   // Not ready - show dropdown with blocking reasons and warnings
-  if (status && !status.ready) {
+  if (status && (!status.ready || hasUnsyncedRelatedAssets)) {
     const blockingReasons = getBlockingReasons();
     return (
       <DropdownMenu>

@@ -27,7 +27,7 @@ export default function StorageImportPage() {
   const [fileId, setFileId] = useState("");
   const [folderId, setFolderId] = useState("");
   const [recursive, setRecursive] = useState(true);
-  const [extensions, setExtensions] = useState(".mp4,.mov,.mp3,.wav,.m4a");
+  const [extensions, setExtensions] = useState(".mp4,.mov,.mp3,.wav,.m4a,.aac,.ogg");
   const [extractMetadata, setExtractMetadata] = useState(true);
   const [triggerIngestion, setTriggerIngestion] = useState(false);
   const [dryRun, setDryRun] = useState(false);
@@ -60,62 +60,57 @@ export default function StorageImportPage() {
     });
 
     try {
-      // 1. Upload file
+      // Upload file and create asset record in one call
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("provider", provider);
-      if (uploadDirectory) {
+      if (provider === "gdrive" && uploadDirectory) {
         formData.append("directory", uploadDirectory);
       }
+      if (provider === "backblaze") {
+        formData.append("use_delivery_path", "true");
+      }
+      formData.append("extract_metadata", String(extractMetadata));
+      formData.append("trigger_ingestion", String(triggerIngestion));
 
       const uploadRes = await fetch("/api/pipeline/upload", {
         method: "POST",
         body: formData,
       });
 
-      if (!uploadRes.ok) {
-        const errorData = await uploadRes.json().catch(() => ({}));
-        throw new Error(errorData.error || "Upload failed");
-      }
       const uploadData = await uploadRes.json();
 
-      // 2. Trigger import
-      update({
-        id,
-        title: "Processing...",
-        description: "Creating asset record",
-      });
-
-      const importRes = await fetch("/api/pipeline", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          endpoint: "/api/v1/admin/assets/import",
-          method: "POST",
-          data: {
-            provider,
-            file_id: uploadData.key,
-            extract_metadata: extractMetadata,
-            trigger_ingestion: triggerIngestion,
-          },
-        }),
-      });
-
-      const importData = await importRes.json();
-
-      if (!importRes.ok || importData.status >= 400) {
-        throw new Error(importData.data?.error || importData.error || "Import failed");
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Upload failed");
       }
 
-      // 3. Show success
-      const assetId = importData.data?.asset?.id;
-      const isCreated = importData.status === 201;
-      const isUpdated = importData.status === 200;
+      // Handle response based on structure
+      const assetId = uploadData.asset_id;
+      const isDuplicate = uploadData.duplicate === true;
+      const assetCreated = uploadData.asset_created === true;
+
+      let title: string;
+      let description: string;
+      let message: string;
+
+      if (isDuplicate) {
+        title = "Duplicate detected";
+        description = `File already exists as asset ${uploadData.duplicate_asset_id?.substring(0, 8)}...`;
+        message = "Duplicate file detected - linked to existing asset";
+      } else if (assetCreated) {
+        title = "Upload complete!";
+        description = `New asset created: ${selectedFile.name}`;
+        message = "File uploaded and new asset created successfully!";
+      } else {
+        title = "Upload complete!";
+        description = selectedFile.name;
+        message = "File uploaded successfully!";
+      }
 
       update({
         id,
-        title: "Upload complete!",
-        description: "Asset created successfully",
+        title,
+        description,
         action: assetId ? (
           <ToastAction altText="View asset" asChild>
             <Link href={`/assets/${assetId}`}>View Asset</Link>
@@ -127,13 +122,9 @@ export default function StorageImportPage() {
       // Update result panel
       setResult({
         success: true,
-        message: isCreated
-          ? "New asset created successfully!"
-          : isUpdated
-            ? "Existing asset updated."
-            : "File uploaded and imported successfully!",
-        data: importData.data,
-        jobId: importData.data?.job_id,
+        message,
+        data: uploadData,
+        jobId: uploadData.job_id,
       });
 
       // Clear file selection
@@ -169,6 +160,8 @@ export default function StorageImportPage() {
             file_id: fileId,
             extract_metadata: extractMetadata,
             trigger_ingestion: triggerIngestion,
+            // For Backblaze imports, move files to organized path
+            ...(provider === "backblaze" && { use_delivery_path: true }),
           }
         : {
             provider,
@@ -178,6 +171,8 @@ export default function StorageImportPage() {
             extract_metadata: extractMetadata,
             trigger_ingestion: triggerIngestion,
             dry_run: dryRun,
+            // For Backblaze imports, move files to organized path
+            ...(provider === "backblaze" && { use_delivery_path: true }),
           };
 
       const response = await fetch("/api/pipeline", {
@@ -304,7 +299,7 @@ export default function StorageImportPage() {
                   <input
                     type="file"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    accept=".mp4,.mov,.mp3,.wav,.m4a,.mkv,.avi"
+                    accept=".mp4,.mov,.mp3,.wav,.m4a,.mkv,.avi,.aac,.ogg"
                     className="hidden"
                     id="file-upload"
                   />
@@ -324,25 +319,31 @@ export default function StorageImportPage() {
                         <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                         <p className="mt-2">Drop a file here or click to browse</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Supports: .mp4, .mov, .mp3, .wav, .m4a, .mkv, .avi
+                          Supports: .mp4, .mov, .mp3, .wav, .m4a, .mkv, .avi, .aac, .ogg
                         </p>
                       </div>
                     )}
                   </label>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="uploadDirectory">Directory Path (optional)</Label>
-                  <Input
-                    id="uploadDirectory"
-                    value={uploadDirectory}
-                    onChange={(e) => setUploadDirectory(e.target.value)}
-                    placeholder="media/2024/videos"
-                  />
+                {provider === "backblaze" ? (
                   <p className="text-xs text-muted-foreground">
-                    Storage path prefix. Leave empty to upload to root.
+                    Files are automatically stored at <code className="bg-muted px-1 rounded">assets/&#123;asset_id&#125;/...</code>
                   </p>
-                </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="uploadDirectory">Directory Path (optional)</Label>
+                    <Input
+                      id="uploadDirectory"
+                      value={uploadDirectory}
+                      onChange={(e) => setUploadDirectory(e.target.value)}
+                      placeholder="media/2024/videos"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Storage path prefix in Google Drive. Leave empty to upload to root.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -527,29 +528,47 @@ export default function StorageImportPage() {
                 </div>
               )}
 
-              {(result.data?.asset || result.data?.asset_id) && (
+              {result.data?.asset_id && (
                 <div className="space-y-2">
-                  <h3 className="font-medium">Asset Created/Updated</h3>
+                  {/* Duplicate warning */}
+                  {result.data.duplicate && (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                      <p className="text-sm text-amber-800 font-medium">Duplicate file detected</p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        This file already exists and has been linked to the existing asset.
+                      </p>
+                    </div>
+                  )}
+
+                  <h3 className="font-medium">
+                    {result.data.asset_created ? "New Asset Created" : "Linked to Existing Asset"}
+                  </h3>
                   <div className="text-sm space-y-1">
                     <p>
-                      <span className="text-muted-foreground">ID:</span>{" "}
-                      <code className="font-mono">{result.data.asset?.id || result.data.asset_id}</code>
+                      <span className="text-muted-foreground">Asset ID:</span>{" "}
+                      <code className="font-mono">{result.data.asset_id}</code>
                     </p>
-                    {(result.data.asset?.title || result.data.name) && (
+                    {result.data.key && (
                       <p>
-                        <span className="text-muted-foreground">Name:</span>{" "}
-                        {result.data.asset?.title || result.data.name}
+                        <span className="text-muted-foreground">Storage Key:</span>{" "}
+                        <code className="font-mono text-xs">{result.data.key}</code>
                       </p>
                     )}
-                    {(result.data.asset?.filepath || result.data.filepath) && (
+                    {result.data.size && (
                       <p>
-                        <span className="text-muted-foreground">Path:</span>{" "}
-                        <code className="font-mono text-xs">{result.data.asset?.filepath || result.data.filepath}</code>
+                        <span className="text-muted-foreground">Size:</span>{" "}
+                        {(result.data.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    )}
+                    {result.data.content_hash && (
+                      <p>
+                        <span className="text-muted-foreground">Hash:</span>{" "}
+                        <code className="font-mono text-xs">{result.data.content_hash}</code>
                       </p>
                     )}
                   </div>
                   <Link
-                    href={`/assets/${result.data.asset?.id || result.data.asset_id}`}
+                    href={`/assets/${result.data.asset_id}`}
                     className="text-sm text-blue-600 hover:underline"
                   >
                     View asset →

@@ -11,6 +11,9 @@ interface DeletePreview {
     asset_type: string;
     has_mux_asset: boolean;
     mux_asset_id?: string;
+    has_delivery_ref: boolean;
+    has_source_ref: boolean;
+    source_provider?: string;
   };
   transcripts: Array<{
     id: string;
@@ -38,6 +41,8 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
   const [cascadeTranscripts, setCascadeTranscripts] = useState(true);
   const [cascadeMuxTracks, setCascadeMuxTracks] = useState(true);
   const [deleteMux, setDeleteMux] = useState(false);
+  const [deleteDelivery, setDeleteDelivery] = useState(true); // Default to deleting from CDN
+  const [deleteSource, setDeleteSource] = useState(false);
   const [deleteMode, setDeleteMode] = useState<"soft" | "hard">("soft");
   const router = useRouter();
 
@@ -96,6 +101,16 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
         // Add delete_mux for video assets (only for hard delete)
         if (deleteMode === "hard" && deleteMux && preview?.asset?.has_mux_asset) {
           params.set("delete_mux", "true");
+        }
+
+        // Add delete_delivery for CDN files (only for hard delete)
+        if (deleteMode === "hard" && deleteDelivery) {
+          params.set("delete_delivery", "true");
+        }
+
+        // Add delete_source for source storage files (only for hard delete)
+        if (deleteMode === "hard" && deleteSource) {
+          params.set("delete_source", "true");
         }
 
         const queryString = params.toString();
@@ -256,17 +271,44 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
               </div>
             )}
 
-            {/* Mux video asset option - only for hard delete */}
-            {deleteMode === "hard" && preview.asset?.has_mux_asset && (
-              <div className="pt-2 border-t">
+            {/* Storage deletion options - only for hard delete */}
+            {deleteMode === "hard" && (
+              <div className="pt-2 border-t space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Also delete files from:</p>
+
+                {/* Mux video asset option */}
+                {preview.asset?.has_mux_asset && (
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={deleteMux}
+                      onChange={(e) => setDeleteMux(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span>Mux ({preview.asset.mux_asset_id?.substring(0, 12)}...)</span>
+                  </label>
+                )}
+
+                {/* CDN delivery storage option */}
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={deleteMux}
-                    onChange={(e) => setDeleteMux(e.target.checked)}
+                    checked={deleteDelivery}
+                    onChange={(e) => setDeleteDelivery(e.target.checked)}
                     className="rounded"
                   />
-                  <span>Also delete from Mux ({preview.asset.mux_asset_id?.substring(0, 12)}...)</span>
+                  <span>CDN delivery storage (Backblaze)</span>
+                </label>
+
+                {/* Source storage option */}
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={deleteSource}
+                    onChange={(e) => setDeleteSource(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span>Source storage {preview.asset?.source_provider ? `(${preview.asset.source_provider})` : "(GDrive/Backblaze)"}</span>
                 </label>
               </div>
             )}
@@ -293,6 +335,8 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
               setShowConfirm(false);
               setPreview(null);
               setDeleteMode("soft");
+              setDeleteDelivery(true);
+              setDeleteSource(false);
             }}
             disabled={isPending}
           >
@@ -340,6 +384,35 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
         </label>
       </div>
 
+      {/* Storage deletion options - only for hard delete */}
+      {deleteMode === "hard" && (
+        <div className="pt-2 border-t space-y-2">
+          <p className="text-sm font-medium text-muted-foreground">Also delete files from:</p>
+
+          {/* CDN delivery storage option */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={deleteDelivery}
+              onChange={(e) => setDeleteDelivery(e.target.checked)}
+              className="rounded"
+            />
+            <span>CDN delivery storage (Backblaze)</span>
+          </label>
+
+          {/* Source storage option */}
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={deleteSource}
+              onChange={(e) => setDeleteSource(e.target.checked)}
+              className="rounded"
+            />
+            <span>Source storage (GDrive/Backblaze)</span>
+          </label>
+        </div>
+      )}
+
       <div className="flex gap-2 pt-2">
         <Button
           type="button"
@@ -357,6 +430,8 @@ export function DeleteAssetButton({ id, assetType, hasLinkedTranscripts }: Delet
           onClick={() => {
             setShowConfirm(false);
             setDeleteMode("soft");
+            setDeleteDelivery(true);
+            setDeleteSource(false);
           }}
           disabled={isPending}
         >

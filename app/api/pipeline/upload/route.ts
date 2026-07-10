@@ -9,6 +9,9 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file");
     const provider = formData.get("provider") || "backblaze";
     const directory = formData.get("directory");
+    const useDeliveryPath = formData.get("use_delivery_path");
+    const extractMetadata = formData.get("extract_metadata");
+    const triggerIngestion = formData.get("trigger_ingestion");
 
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
@@ -23,6 +26,15 @@ export async function POST(request: NextRequest) {
     pipelineFormData.append("provider", provider as string);
     if (directory) {
       pipelineFormData.append("directory", directory as string);
+    }
+    if (useDeliveryPath) {
+      pipelineFormData.append("use_delivery_path", useDeliveryPath as string);
+    }
+    if (extractMetadata) {
+      pipelineFormData.append("extract_metadata", extractMetadata as string);
+    }
+    if (triggerIngestion) {
+      pipelineFormData.append("trigger_ingestion", triggerIngestion as string);
     }
 
     // Forward to pipeline API (let fetch set the Content-Type with boundary)

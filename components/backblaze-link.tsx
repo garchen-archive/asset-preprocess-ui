@@ -32,7 +32,7 @@ export function BackblazeLink({ fileKey, variant = "full", label, className = ""
   };
 
   // Determine icon based on file extension
-  const isMedia = fileKey.match(/\.(mp4|webm|mov|mp3|wav|m4a)$/i);
+  const isMedia = fileKey.match(/\.(mp4|webm|mov|mp3|wav|m4a|aac|ogg)$/i);
   const defaultLabel = isMedia ? "Play from Storage" : "Open from Storage";
 
   // Icons with configurable size
