@@ -814,3 +814,55 @@ export const relatedContent = pgTable("related_content", {
 
 export type RelatedContent = typeof relatedContent.$inferSelect;
 export type NewRelatedContent = typeof relatedContent.$inferInsert;
+
+// ============================================================================
+// CMS TABLES
+// Content management system tables for public site
+// ============================================================================
+
+// Locales table
+export const locales = pgTable("locales", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: text("code").notNull().unique(), // en, bo, zh, etc.
+  displayName: text("display_name").notNull(),
+  nativeName: text("native_name"),
+  isActive: boolean("is_active").notNull().default(true),
+  isDefault: boolean("is_default").notNull().default(false),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Locale = typeof locales.$inferSelect;
+
+// Contents table - represents content items (events, sessions, etc. in CMS)
+export const contents = pgTable("contents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  contentType: text("content_type").notNull(), // event, session, page, etc.
+  familyId: uuid("family_id"), // References the source entity (event_id, session_id, etc.)
+  slug: text("slug"),
+  status: text("status").default("draft"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type Content = typeof contents.$inferSelect;
+
+// Content translations table
+export const contentTranslations = pgTable("content_translations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  contentId: uuid("content_id").notNull().references(() => contents.id, { onDelete: "cascade" }),
+  localeId: uuid("locale_id").notNull().references(() => locales.id, { onDelete: "restrict" }),
+  familyId: uuid("family_id"), // Denormalized from contents for easier querying
+  title: text("title").notNull(),
+  summary: text("summary"),
+  content: jsonb("content").$type<Record<string, any>>().notNull(),
+  metadata: jsonb("metadata").$type<Record<string, any>>(), // Contains path and other CMS data
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
+});
+
+export type ContentTranslation = typeof contentTranslations.$inferSelect;

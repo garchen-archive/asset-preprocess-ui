@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset, relatedContent, assetExternalRef } from "@/lib/db/schema";
+import { events, sessions, topics, categories, eventTopics, eventCategories, archiveAssets, organizations, addresses, venues, locations, eventSessionAsset, asset, collection, collectionItem, relatedAsset, relatedContent, assetExternalRef, contents, contentTranslations, locales } from "@/lib/db/schema";
 import { eq, sql, inArray, asc, desc, and, isNull, isNotNull, aliasedTable } from "drizzle-orm";
 import { getPresignedUrl } from "@/lib/storage/backblaze";
 import Link from "next/link";
@@ -52,6 +52,28 @@ export default async function EventDetailPage({
   if (!event) {
     notFound();
   }
+
+  // Get public site path from content_translations content column (path is in content, not metadata)
+  const [cmsContent] = await db
+    .select({
+      content: contentTranslations.content,
+    })
+    .from(contentTranslations)
+    .innerJoin(locales, eq(contentTranslations.localeId, locales.id))
+    .where(
+      and(
+        eq(contentTranslations.familyId, params.id),
+        eq(locales.isDefault, true),
+        isNull(contentTranslations.deletedAt)
+      )
+    )
+    .limit(1);
+
+  // Extract path from content
+  const publicSitePath = (cmsContent?.content as Record<string, any>)?.path;
+  const publicSiteUrl = publicSitePath
+    ? `${process.env.NEXT_PUBLIC_SITE_URL || "https://garchen.net"}${publicSitePath}`
+    : null;
 
   // Extract date metadata for display
   const dateMeta = getDateMeta(event.additionalMetadata);
@@ -522,6 +544,19 @@ export default async function EventDetailPage({
         <div className="flex-1">
           <Breadcrumbs items={breadcrumbItems} />
           <h1 className="text-3xl font-bold">{event.eventName}</h1>
+          {publicSiteUrl && (
+            <a
+              href={publicSiteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-blue-600 mt-1"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              View on public site
+            </a>
+          )}
         </div>
         {!isDeleted && (
           <div className="flex items-center gap-2">

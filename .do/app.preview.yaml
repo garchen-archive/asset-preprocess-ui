@@ -48,6 +48,11 @@ services:
         scope: RUN_TIME
         value: ${APP_URL}
 
+      # Public Site URL (for "View on public site" links)
+      - key: NEXT_PUBLIC_SITE_URL
+        scope: RUN_TIME
+        value: ${PUBLIC_SITE_URL}
+
       # Backblaze B2 Storage
       - key: BACKBLAZE_ENDPOINT
         scope: RUN_TIME

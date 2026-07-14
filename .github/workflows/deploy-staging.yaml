@@ -87,6 +87,7 @@ jobs:
           BACKBLAZE_BUCKET_NAME: ${{ secrets.BACKBLAZE_BUCKET_NAME }}
           PIPELINE_API_URL: ${{ secrets.PIPELINE_API_URL }}
           PIPELINE_API_KEY: ${{ secrets.PIPELINE_API_KEY }}
+          PUBLIC_SITE_URL: ${{ secrets.PUBLIC_SITE_URL }}
 
       - name: Summary
         run: |
