@@ -77,8 +77,10 @@ export function MuxSyncWidget({
   const isReady = status === "ready";
 
   const handleSync = async () => {
+    console.log("handleSync called for asset:", assetId);
     setIsSyncing(true);
     try {
+      console.log("Sending sync request to pipeline...");
       const response = await fetch("/api/pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -87,6 +89,7 @@ export function MuxSyncWidget({
           method: "POST",
         }),
       });
+      console.log("Sync response status:", response.status);
 
       const result = await response.json();
 
@@ -226,8 +229,34 @@ export function MuxSyncWidget({
               </p>
             </div>
           </div>
+        ) : status === "errored" ? (
+          // Error state
+          <div className="flex items-start gap-4 p-4 rounded-lg bg-red-50 border border-red-200">
+            <div className="flex-shrink-0 mt-0.5">
+              <div className="w-3 h-3 rounded-full bg-red-500" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-red-800">Mux Sync Failed</p>
+                  <p className="text-sm text-red-600 mt-1">
+                    There was an error processing this video. Try re-syncing or check the source file.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                  className="border-red-300 text-red-700 hover:bg-red-50"
+                >
+                  {isSyncing ? "Re-syncing..." : "Retry Sync"}
+                </Button>
+              </div>
+            </div>
+          </div>
         ) : (
-          // Synced
+          // Synced and ready
           <div className="flex items-start gap-4 p-4 rounded-lg bg-green-50 border border-green-200">
             <div className="flex-shrink-0 mt-0.5">
               <div className="w-3 h-3 rounded-full bg-green-500" />
