@@ -18,6 +18,7 @@ import { AssetCdnSync } from "@/components/asset-cdn-sync";
 import { ThumbnailTimeInput } from "@/components/thumbnail-time-input";
 import { DeletedBanner } from "@/components/deleted-banner";
 import { InlineLocaleSelector } from "@/components/inline-locale-selector";
+import { AssetActivityLog } from "@/components/asset-activity-log";
 
 export const dynamic = "force-dynamic";
 
@@ -810,6 +811,9 @@ export default async function AssetDetailPage({
               </div>
             </div>
           </div>
+
+          {/* Activity Log */}
+          <AssetActivityLog assetId={params.id} />
         </div>
 
         {/* Right column - Sidebar */}
