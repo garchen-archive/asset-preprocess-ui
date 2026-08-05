@@ -8,6 +8,7 @@ export const VARIANT_TYPES = {
   alternate: "Alternate",
   edited: "Edited",
   interpretation: "With Interpreter",
+  interpreter_only: "Interpreter Only",
 } as const;
 
 export type VariantType = keyof typeof VARIANT_TYPES;
