@@ -30,6 +30,8 @@ interface VisibleColumns {
   sessions: boolean;
   assets: boolean;
   status: boolean;
+  createdAt: boolean;
+  updatedAt: boolean;
 }
 
 interface ExpandableEventRowProps {
@@ -50,16 +52,18 @@ interface ExpandableEventRowProps {
 
 const defaultVisibleColumns: VisibleColumns = {
   eventName: true,
-  type: true,
+  type: false,
   format: false,
   dateRange: true,
   topic: false,
   category: false,
   hostOrg: false,
-  childEvents: true,
+  childEvents: false,
   sessions: true,
   assets: true,
-  status: true,
+  status: false,
+  createdAt: true,
+  updatedAt: true,
 };
 
 const FORMAT_LABELS: Record<string, string> = {
@@ -237,6 +241,16 @@ export function ExpandableEventRow({
             >
               {event.catalogingStatus || "Not Started"}
             </span>
+          </td>
+        )}
+        {visibleColumns.createdAt && (
+          <td className="px-4 py-3 text-sm text-muted-foreground">
+            {event.createdAt ? new Date(event.createdAt).toLocaleDateString() : "—"}
+          </td>
+        )}
+        {visibleColumns.updatedAt && (
+          <td className="px-4 py-3 text-sm text-muted-foreground">
+            {event.updatedAt ? new Date(event.updatedAt).toLocaleDateString() : "—"}
           </td>
         )}
         <td className="px-4 py-3 text-sm" onClick={(e) => e.stopPropagation()}>

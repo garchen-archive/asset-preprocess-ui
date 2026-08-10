@@ -1,5 +1,5 @@
 import { db } from "@/lib/db/client";
-import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, locations, eventSessionAsset, asset, transcripts, venue, address } from "@/lib/db/schema";
+import { sessions, archiveAssets, events, topics, categories, sessionTopics, sessionCategories, eventTopics, eventCategories, locations, eventSessionAsset, asset, transcripts, venue, address } from "@/lib/db/schema";
 import { eq, asc, and, isNull, aliasedTable } from "drizzle-orm";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -94,6 +94,30 @@ export default async function SessionDetailPage({
     .from(sessionCategories)
     .innerJoin(categories, eq(sessionCategories.categoryId, categories.id))
     .where(eq(sessionCategories.eventSessionId, params.id));
+
+  // Get topics inherited from the event
+  const eventTopicsList = event
+    ? await db
+        .select({
+          id: topics.id,
+          name: topics.name,
+        })
+        .from(eventTopics)
+        .innerJoin(topics, eq(eventTopics.topicId, topics.id))
+        .where(eq(eventTopics.eventId, event.id))
+    : [];
+
+  // Get categories inherited from the event
+  const eventCategoriesList = event
+    ? await db
+        .select({
+          id: categories.id,
+          name: categories.name,
+        })
+        .from(eventCategories)
+        .innerJoin(categories, eq(eventCategories.categoryId, categories.id))
+        .where(eq(eventCategories.eventId, event.id))
+    : [];
 
   // Note: Associated Media and Related Content are managed at event level for MVP
   // Sessions inherit these from their parent event
@@ -313,14 +337,6 @@ export default async function SessionDetailPage({
                 <dd className="text-sm mt-1">{session.sessionTime || "—"}</dd>
               </div>
               <div>
-                <dt className="text-sm font-medium text-muted-foreground">Start Time</dt>
-                <dd className="text-sm mt-1">{session.sessionStartTime || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">End Time</dt>
-                <dd className="text-sm mt-1">{session.sessionEndTime || "—"}</dd>
-              </div>
-              <div>
                 <dt className="text-sm font-medium text-muted-foreground">Duration (Estimated)</dt>
                 <dd className="text-sm mt-1">{session.durationEstimated || "—"}</dd>
               </div>
@@ -346,8 +362,17 @@ export default async function SessionDetailPage({
                         {cat.name}
                       </Badge>
                     ))
+                  ) : eventCategoriesList.length > 0 ? (
+                    eventCategoriesList.map((cat) => (
+                      <Badge key={cat.id} variant="outline" className="border-dashed">
+                        {cat.name}
+                      </Badge>
+                    ))
                   ) : (
                     <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                  {sessionCategoriesList.length === 0 && eventCategoriesList.length > 0 && (
+                    <span className="text-xs text-muted-foreground ml-1">(from event)</span>
                   )}
                 </dd>
               </div>
@@ -360,8 +385,17 @@ export default async function SessionDetailPage({
                         {topic.name}
                       </Badge>
                     ))
+                  ) : eventTopicsList.length > 0 ? (
+                    eventTopicsList.map((topic) => (
+                      <Badge key={topic.id} variant="outline" className="border-dashed">
+                        {topic.name}
+                      </Badge>
+                    ))
                   ) : (
                     <span className="text-sm text-muted-foreground">—</span>
+                  )}
+                  {sessionTopicsList.length === 0 && eventTopicsList.length > 0 && (
+                    <span className="text-xs text-muted-foreground ml-1">(from event)</span>
                   )}
                 </dd>
               </div>

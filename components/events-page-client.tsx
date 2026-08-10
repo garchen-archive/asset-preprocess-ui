@@ -22,16 +22,18 @@ type EventRow = {
 
 const DEFAULT_COLUMNS: ColumnConfig[] = [
   { key: "eventName", label: "Event Name", visible: true },
-  { key: "type", label: "Type", visible: true },
+  { key: "type", label: "Type", visible: false },
   { key: "format", label: "Format", visible: false },
   { key: "dateRange", label: "Date Range", visible: true },
-  { key: "childEvents", label: "Child Events", visible: true },
+  { key: "childEvents", label: "Child Events", visible: false },
   { key: "sessions", label: "Sessions", visible: true },
   { key: "assets", label: "Assets", visible: true },
-  { key: "status", label: "Status", visible: true },
+  { key: "status", label: "Status", visible: false },
   { key: "topic", label: "Topic", visible: false },
   { key: "category", label: "Category", visible: false },
   { key: "hostOrg", label: "Host Org", visible: false },
+  { key: "createdAt", label: "Created", visible: true },
+  { key: "updatedAt", label: "Updated", visible: true },
 ];
 
 type EventsPageClientProps = {
@@ -216,6 +218,12 @@ export function EventsPageClient({
               {isColumnVisible("status") && (
                 <th className="px-4 py-3 text-left text-sm font-medium">Status</th>
               )}
+              {isColumnVisible("createdAt") && (
+                <SortableHeader column="createdAt">Created</SortableHeader>
+              )}
+              {isColumnVisible("updatedAt") && (
+                <SortableHeader column="updatedAt">Updated</SortableHeader>
+              )}
               <th className="px-4 py-3 text-left text-sm font-medium">Actions</th>
             </tr>
           </thead>
@@ -247,6 +255,8 @@ export function EventsPageClient({
                   sessions: isColumnVisible("sessions"),
                   assets: isColumnVisible("assets"),
                   status: isColumnVisible("status"),
+                  createdAt: isColumnVisible("createdAt"),
+                  updatedAt: isColumnVisible("updatedAt"),
                 }}
               />
             ))}

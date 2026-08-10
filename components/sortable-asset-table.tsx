@@ -76,6 +76,7 @@ interface SortableAssetTableProps {
   showLocaleColumn?: boolean;
   tableId: string; // Used to namespace sort params (e.g., "direct" or "session")
   onVariantChange?: (linkId: string, newVariantType: string) => Promise<void>;
+  onRemove?: (linkId: string, assetName: string) => Promise<void>;
 }
 
 export function SortableAssetTable({
@@ -86,9 +87,11 @@ export function SortableAssetTable({
   showLocaleColumn = false,
   tableId,
   onVariantChange,
+  onRemove,
 }: SortableAssetTableProps) {
   const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [removingLinkId, setRemovingLinkId] = useState<string | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -305,12 +308,29 @@ export function SortableAssetTable({
                   </div>
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  <Link
-                    href={`/assets/${asset.id}`}
-                    className="text-blue-600 hover:underline"
-                  >
-                    View
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/assets/${asset.id}`}
+                      className="text-blue-600 hover:underline"
+                    >
+                      View
+                    </Link>
+                    {onRemove && asset.linkId && (
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Remove "${asset.title || asset.name || "this asset"}" from this session?`)) {
+                            setRemovingLinkId(asset.linkId!);
+                            await onRemove(asset.linkId!, asset.title || asset.name || "Asset");
+                            setRemovingLinkId(null);
+                          }
+                        }}
+                        disabled={removingLinkId === asset.linkId}
+                        className="text-red-600 hover:underline disabled:opacity-50"
+                      >
+                        {removingLinkId === asset.linkId ? "Removing..." : "Unlink"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
