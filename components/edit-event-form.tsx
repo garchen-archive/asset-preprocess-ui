@@ -168,34 +168,6 @@ export function EditEventForm({
             </div>
 
             <div>
-              <Label htmlFor="eventType">Event Type</Label>
-              <Input
-                id="eventType"
-                name="eventType"
-                defaultValue={event.eventType || ""}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="eventFormat">Event Format</Label>
-              <select
-                id="eventFormat"
-                name="eventFormat"
-                defaultValue={event.eventFormat || ""}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Select format...</option>
-                <option value="single_recording">Single Recording</option>
-                <option value="series">Series</option>
-                <option value="retreat">Retreat</option>
-                <option value="collection">Collection</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Structure of this event&apos;s recordings
-              </p>
-            </div>
-
-            <div>
               <Label htmlFor="eventDateStart">Start Date</Label>
               <div className="flex gap-2">
                 <Input
@@ -492,21 +464,6 @@ export function EditEventForm({
         <div className="rounded-lg border p-6">
           <h2 className="text-xl font-semibold mb-4">Administrative</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="catalogingStatus">Cataloging Status</Label>
-              <select
-                id="catalogingStatus"
-                name="catalogingStatus"
-                defaultValue={event.catalogingStatus || ""}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Not Started</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Ready">Ready</option>
-                <option value="Needs Review">Needs Review</option>
-              </select>
-            </div>
-
             <div>
               <Label htmlFor="publicationStatus">Publication Status</Label>
               <select

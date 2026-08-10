@@ -23,7 +23,16 @@ export async function POST(request: NextRequest) {
       body: data ? JSON.stringify(data) : undefined,
     });
 
-    const responseData = await response.json().catch(() => null);
+    // Check content type to handle text responses (e.g., VTT files)
+    const contentType = response.headers.get("content-type") || "";
+    let responseData;
+
+    if (contentType.includes("application/json")) {
+      responseData = await response.json().catch(() => null);
+    } else {
+      // Plain text response (VTT, SRT, etc.)
+      responseData = await response.text().catch(() => null);
+    }
 
     return NextResponse.json(
       { data: responseData, status: response.status },

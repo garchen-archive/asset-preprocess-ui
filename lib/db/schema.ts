@@ -196,6 +196,7 @@ export const assetExternalRef = pgTable("asset_external_ref", {
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at"),
 });
 
 export type AssetExternalRef = typeof assetExternalRef.$inferSelect;

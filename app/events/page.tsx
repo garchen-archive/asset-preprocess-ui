@@ -291,6 +291,7 @@ export default async function EventsPage({
         topic: events.topic,
         category: events.category,
         createdAt: events.createdAt,
+        updatedAt: events.updatedAt,
       }[sortBy] || events.createdAt;
       return sortOrder === "asc" ? asc(col) : desc(col);
     })())

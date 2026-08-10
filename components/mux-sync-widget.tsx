@@ -7,12 +7,12 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface MuxTrack {
   track_id: string;
-  language: string;
   name?: string;
   type?: string;
   text_type?: string;
   status: string;
-  transcript_id?: string;
+  language_code?: string;
+  synced_at?: string;
 }
 
 interface MuxSyncWidgetProps {
@@ -42,9 +42,11 @@ export function MuxSyncWidget({
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [tracks, setTracks] = useState<MuxTrack[]>([]);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
+  const [vttModal, setVttModal] = useState<{ track: MuxTrack; content: string } | null>(null);
+  const [isLoadingVtt, setIsLoadingVtt] = useState(false);
   const { toast } = useToast();
 
-  // Fetch tracks when synced
+  // Fetch tracks from pipeline API when synced
   useEffect(() => {
     if (mediaProvider === "mux" && mediaProviderAssetId && status === "ready") {
       fetchTracks();
@@ -58,18 +60,53 @@ export function MuxSyncWidget({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          endpoint: `/api/v1/assets/${assetId}/tracks`,
+          endpoint: `/api/v1/assets/${assetId}`,
           method: "GET",
         }),
       });
       const result = await response.json();
-      if (response.ok && result.data?.tracks) {
-        setTracks(result.data.tracks);
+      // Extract tracks from media_ref.metadata.tracks (object keyed by lang_trackId)
+      const tracksObj = result.data?.media_ref?.metadata?.tracks;
+      if (tracksObj && typeof tracksObj === "object") {
+        const tracksList = Object.values(tracksObj) as MuxTrack[];
+        setTracks(tracksList);
       }
     } catch {
       // Silently fail - tracks section just won't show
     } finally {
       setIsLoadingTracks(false);
+    }
+  };
+
+  const fetchVtt = async (track: MuxTrack) => {
+    setIsLoadingVtt(true);
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/assets/${assetId}/tracks/${track.track_id}/vtt`,
+          method: "GET",
+        }),
+      });
+      const result = await response.json();
+      if (response.ok && result.data) {
+        // VTT content is returned as plain text string
+        const content = typeof result.data === "string"
+          ? result.data
+          : JSON.stringify(result.data, null, 2);
+        setVttModal({ track, content });
+      } else {
+        throw new Error(result.error || "Failed to fetch VTT");
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to load subtitle content",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingVtt(false);
     }
   };
 
@@ -334,41 +371,60 @@ export function MuxSyncWidget({
                       key={track.track_id}
                       className="flex items-center justify-between p-2 rounded bg-muted/30"
                     >
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">
-                          {track.name || track.language?.toUpperCase() || "Unknown"}
-                        </span>
-                        {track.text_type && (
-                          <Badge variant="outline" className="text-xs">
-                            {track.text_type}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {track.name || track.language_code?.toUpperCase() || "Unknown"}
+                          </span>
+                          {track.language_code && (
+                            <span className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
+                              {track.language_code}
+                            </span>
+                          )}
+                          {track.text_type && (
+                            <Badge variant="outline" className="text-xs">
+                              {track.text_type}
+                            </Badge>
+                          )}
+                          <Badge
+                            variant={track.status === "ready" ? "default" : "secondary"}
+                            className={track.status === "ready" ? "bg-green-100 text-green-700" : ""}
+                          >
+                            {track.status}
                           </Badge>
-                        )}
-                        <Badge
-                          variant={track.status === "ready" ? "default" : "secondary"}
-                          className={track.status === "ready" ? "bg-green-100 text-green-700" : ""}
-                        >
-                          {track.status}
-                        </Badge>
+                        </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDeleteTrack(track.track_id)}
-                        disabled={isDeleting === track.track_id}
-                        title="Remove track"
-                      >
-                        {isDeleting === track.track_id ? (
-                          <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                          </svg>
-                        ) : (
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        )}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => fetchVtt(track)}
+                          disabled={isLoadingVtt}
+                          title="View VTT content"
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDeleteTrack(track.track_id)}
+                          disabled={isDeleting === track.track_id}
+                          title="Remove track"
+                        >
+                          {isDeleting === track.track_id ? (
+                            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                          ) : (
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -379,6 +435,56 @@ export function MuxSyncWidget({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* VTT Content Modal */}
+      {vttModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setVttModal(null)}
+          />
+          <div className="relative bg-background rounded-lg shadow-lg w-full max-w-2xl max-h-[80vh] m-4 flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <div>
+                <h3 className="font-semibold">
+                  {vttModal.track.name || vttModal.track.language_code?.toUpperCase()}
+                </h3>
+                <p className="text-xs text-muted-foreground font-mono">
+                  {vttModal.track.track_id}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                onClick={() => setVttModal(null)}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </Button>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              <pre className="text-xs font-mono whitespace-pre-wrap bg-muted/30 p-3 rounded">
+                {vttModal.content}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading overlay for VTT fetch */}
+      {isLoadingVtt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-background rounded-lg p-4 flex items-center gap-2">
+            <svg className="h-5 w-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm">Loading subtitle content...</span>
+          </div>
         </div>
       )}
     </div>

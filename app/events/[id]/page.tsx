@@ -307,7 +307,8 @@ export default async function EventDetailPage({
     // Join to external refs - prefer delivery refs for images (Backblaze CDN)
     .leftJoin(relatedAssetRefAlias, and(
       eq(relatedAsset.assetId, relatedAssetRefAlias.assetId),
-      eq(relatedAssetRefAlias.status, "active")
+      eq(relatedAssetRefAlias.status, "active"),
+      isNull(relatedAssetRefAlias.deletedAt)
     ))
     .where(
       and(
@@ -460,7 +461,8 @@ export default async function EventDetailPage({
     .leftJoin(eventPosterAssetLinkAlias, eq(eventPosterSessionAlias.canonicalEventSessionAssetId, eventPosterAssetLinkAlias.id))
     .leftJoin(eventPosterAssetRefAlias, and(
       eq(eventPosterAssetLinkAlias.assetId, eventPosterAssetRefAlias.assetId),
-      isNotNull(eventPosterAssetRefAlias.thumbnailUrl)
+      isNotNull(eventPosterAssetRefAlias.thumbnailUrl),
+      isNull(eventPosterAssetRefAlias.deletedAt)
     ))
     .leftJoin(relatedSessionAlias, and(
       eq(relatedContent.relatedType, "session"),
@@ -471,7 +473,8 @@ export default async function EventDetailPage({
     .leftJoin(sessionCanonicalAssetLinkAlias, eq(relatedSessionAlias.canonicalEventSessionAssetId, sessionCanonicalAssetLinkAlias.id))
     .leftJoin(sessionCanonicalAssetRefAlias, and(
       eq(sessionCanonicalAssetLinkAlias.assetId, sessionCanonicalAssetRefAlias.assetId),
-      isNotNull(sessionCanonicalAssetRefAlias.thumbnailUrl)
+      isNotNull(sessionCanonicalAssetRefAlias.thumbnailUrl),
+      isNull(sessionCanonicalAssetRefAlias.deletedAt)
     ))
     .where(and(
       eq(relatedContent.ownerType, "event"),
@@ -607,24 +610,6 @@ export default async function EventDetailPage({
           <div className="rounded-lg border p-6">
             <h2 className="text-xl font-semibold mb-4">Event Details</h2>
             <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Event Type</dt>
-                <dd className="text-sm mt-1">{event.eventType || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Event Format</dt>
-                <dd className="text-sm mt-1">
-                  {event.eventFormat ? (
-                    <Badge variant="outline" className="text-xs">
-                      {event.eventFormat === "single_recording" ? "Single Recording" :
-                       event.eventFormat === "series" ? "Series" :
-                       event.eventFormat === "retreat" ? "Retreat" :
-                       event.eventFormat === "collection" ? "Collection" :
-                       event.eventFormat}
-                    </Badge>
-                  ) : "—"}
-                </dd>
-              </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Start Date</dt>
                 <dd className="text-sm mt-1">
@@ -1023,26 +1008,6 @@ export default async function EventDetailPage({
             )}
           </div>
 
-          {/* Direct Event Assets */}
-          <div className="rounded-lg border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Direct Event Assets ({directEventAssets.length})</h2>
-            </div>
-            {directEventAssets.length > 0 ? (
-              <>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Assets assigned directly to this event (not through a session)
-                </p>
-                <SortableAssetTable
-                  assets={directEventAssets}
-                  tableId="direct"
-                />
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No assets assigned directly to this event.</p>
-            )}
-          </div>
-
           {/* Assets from Sessions */}
           <div className="rounded-lg border p-6">
             <div className="flex items-center justify-between mb-4">
@@ -1089,17 +1054,6 @@ export default async function EventDetailPage({
           <div className="rounded-lg border p-6">
             <h2 className="text-xl font-semibold mb-4">Administrative</h2>
             <dl className="space-y-4">
-              <div>
-                <dt className="text-sm font-medium text-muted-foreground">Cataloging Status</dt>
-                <dd className="text-sm mt-1">
-                  <StatusBadge
-                    entityType="event"
-                    entityId={params.id}
-                    statusField="cataloging_status"
-                    currentValue={event.catalogingStatus}
-                  />
-                </dd>
-              </div>
               <div>
                 <dt className="text-sm font-medium text-muted-foreground">Publication Status</dt>
                 <dd className="text-sm mt-1">

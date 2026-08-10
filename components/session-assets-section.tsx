@@ -147,6 +147,38 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
     }
   };
 
+  const handleRemoveAsset = async (linkId: string, assetName: string) => {
+    try {
+      const response = await fetch("/api/pipeline", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: `/api/v1/admin/session-assets/${linkId}`,
+          method: "DELETE",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || result.status >= 400) {
+        throw new Error(result.error || result.data?.error || `HTTP ${result.status}`);
+      }
+
+      toast({
+        title: "Asset removed",
+        description: `${assetName} has been removed from this session.`,
+      });
+
+      router.refresh();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to remove asset",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="rounded-lg border p-6">
       {/* Header */}
@@ -248,6 +280,7 @@ export function SessionAssetsSection({ sessionId, sessionName, assets }: Session
           showLocaleColumn
           tableId="assets"
           onVariantChange={handleVariantChange}
+          onRemove={handleRemoveAsset}
         />
       ) : (
         <p className="text-sm text-muted-foreground">

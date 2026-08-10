@@ -125,7 +125,8 @@ export default async function AssetDetailPage({
       eq(assetExternalRef.assetId, params.id),
       eq(assetExternalRef.provider, "backblaze"),
       eq(assetExternalRef.providerCategory, "delivery"),
-      eq(assetExternalRef.status, "active")
+      eq(assetExternalRef.status, "active"),
+      isNull(assetExternalRef.deletedAt)
     ))
     .limit(1);
 
@@ -139,7 +140,8 @@ export default async function AssetDetailPage({
     .where(and(
       eq(assetExternalRef.assetId, params.id),
       eq(assetExternalRef.provider, "mux"),
-      eq(assetExternalRef.status, "ready")
+      eq(assetExternalRef.status, "ready"),
+      isNull(assetExternalRef.deletedAt)
     ))
     .limit(1);
 
