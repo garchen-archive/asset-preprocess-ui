@@ -134,26 +134,6 @@ export function EditSessionForm({
             </div>
 
             <div>
-              <Label htmlFor="sessionStartTime">Start Time</Label>
-              <Input
-                id="sessionStartTime"
-                name="sessionStartTime"
-                type="time"
-                defaultValue={session.sessionStartTime || ""}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="sessionEndTime">End Time</Label>
-              <Input
-                id="sessionEndTime"
-                name="sessionEndTime"
-                type="time"
-                defaultValue={session.sessionEndTime || ""}
-              />
-            </div>
-
-            <div>
               <Label htmlFor="durationEstimated">Duration (Estimated)</Label>
               <Input
                 id="durationEstimated"
