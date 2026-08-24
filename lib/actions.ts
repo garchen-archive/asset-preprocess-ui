@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { dateCertaintyToMeta, type DateCertainty } from "@/lib/utils";
 import { DEFAULT_VARIANT_TYPE, DEFAULT_VARIANT_LABEL } from "@/lib/variant-types";
 import { fetchAssetContent } from "@/lib/storage/pipeline";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 function parseCoord(value: string | null): number | null {
   if (!value) return null;
@@ -33,7 +34,7 @@ export async function updateAsset(id: string, formData: FormData) {
   const title = formData.get("title") as string;
   if (title) updateRequest.title = title;
 
-  const description = formData.get("descriptionSummary") as string;
+  const description = sanitizeHtml(formData.get("descriptionSummary") as string);
   if (description) updateRequest.description = description;
 
   // Primary locale (language)
@@ -124,7 +125,7 @@ export async function updateAsset(id: string, formData: FormData) {
   const catalogedBy = formData.get("catalogedBy") as string;
   const needsDetailedReview = formData.get("needsDetailedReview") === "on";
   const exclude = formData.get("exclude") === "on";
-  const notes = formData.get("notes") as string;
+  const notes = sanitizeHtml(formData.get("notes") as string);
   if (catalogingStatus || catalogedBy || needsDetailedReview || exclude || notes) {
     metadata.curation.workflow = {
       ...(catalogingStatus && { status: catalogingStatus.toLowerCase().replace(/ /g, '_') }),
@@ -347,9 +348,9 @@ export async function createEvent(prevState: { error: string } | undefined, form
     eventDateEnd: formData.get("eventDateEnd") as string || null,
     eventType: formData.get("eventType") as string || null,
     eventFormat: formData.get("eventFormat") as string || null,
-    eventDescription: formData.get("eventDescription") as string || null,
+    eventDescription: sanitizeHtml(formData.get("eventDescription") as string),
     catalogingStatus: formData.get("catalogingStatus") as string || null,
-    notes: formData.get("notes") as string || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
     createdBy: formData.get("createdBy") as string || null,
     additionalMetadata: finalMetadata,
   };
@@ -479,10 +480,10 @@ export async function updateEvent(id: string, formData: FormData) {
     eventDateEnd: formData.get("eventDateEnd") as string || null,
     eventType: formData.get("eventType") as string || null,
     eventFormat: formData.get("eventFormat") as string || null,
-    eventDescription: formData.get("eventDescription") as string || null,
+    eventDescription: sanitizeHtml(formData.get("eventDescription") as string),
     catalogingStatus: formData.get("catalogingStatus") as string || null,
     publicationStatus: formData.get("publicationStatus") as string || "draft",
-    notes: formData.get("notes") as string || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
     additionalMetadata: Object.keys(additionalMetadata).length > 0 ? additionalMetadata : null,
     updatedAt: new Date(),
   };
@@ -566,8 +567,8 @@ export async function createSession(formData: FormData) {
         session_date: formData.get("sessionDate") as string || null,
         session_start_time: formData.get("sessionStartTime") as string || null,
         session_end_time: formData.get("sessionEndTime") as string || null,
-        session_description: formData.get("sessionDescription") as string || null,
-        notes: formData.get("notes") as string || null,
+        session_description: sanitizeHtml(formData.get("sessionDescription") as string),
+        notes: sanitizeHtml(formData.get("notes") as string),
         day_number: formData.get("dayNumber") ? parseInt(formData.get("dayNumber") as string, 10) : null,
         day_label: formData.get("dayLabel") as string || null,
       }),
@@ -639,8 +640,8 @@ export async function updateSession(id: string, formData: FormData) {
         session_date: formData.get("sessionDate") as string || null,
         session_start_time: formData.get("sessionStartTime") as string || null,
         session_end_time: formData.get("sessionEndTime") as string || null,
-        session_description: formData.get("sessionDescription") as string || null,
-        notes: formData.get("notes") as string || null,
+        session_description: sanitizeHtml(formData.get("sessionDescription") as string),
+        notes: sanitizeHtml(formData.get("notes") as string),
         day_number: formData.get("dayNumber") ? parseInt(formData.get("dayNumber") as string) : undefined,
         day_label: formData.get("dayLabel") as string || undefined,
         cataloging_status: formData.get("catalogingStatus") as string || null,
@@ -807,8 +808,8 @@ export async function createLocation(formData: FormData) {
     alternativeNames,
     locationType: formData.get("locationType") as string || null,
     isOnline,
-    description: formData.get("description") as string || null,
-    notes: formData.get("notes") as string || null,
+    description: sanitizeHtml(formData.get("description") as string),
+    notes: sanitizeHtml(formData.get("notes") as string),
   };
 
   const [newLocation] = await db.insert(locations).values(data).returning();
@@ -841,8 +842,8 @@ export async function updateLocation(id: string, formData: FormData) {
     alternativeNames,
     locationType: formData.get("locationType") as string || null,
     isOnline,
-    description: formData.get("description") as string || null,
-    notes: formData.get("notes") as string || null,
+    description: sanitizeHtml(formData.get("description") as string),
+    notes: sanitizeHtml(formData.get("notes") as string),
     updatedAt: new Date(),
   };
 
@@ -887,8 +888,8 @@ export async function updateLocationWithAddress(id: string, formData: FormData) 
     locationType: formData.get("locationType") as string || null,
     timezone: formData.get("timezone") as string || null,
     isOnline,
-    description: formData.get("description") as string || null,
-    notes: formData.get("notes") as string || null,
+    description: sanitizeHtml(formData.get("description") as string),
+    notes: sanitizeHtml(formData.get("notes") as string),
     updatedAt: new Date(),
   };
 
@@ -971,8 +972,8 @@ export async function createOrganization(formData: FormData) {
     name: formData.get("name") as string,
     alternativeNames,
     orgType: formData.get("orgType") as string || null,
-    description: formData.get("description") as string || null,
-    notes: formData.get("notes") as string || null,
+    description: sanitizeHtml(formData.get("description") as string),
+    notes: sanitizeHtml(formData.get("notes") as string),
   };
 
   const [newOrg] = await db.insert(organizations).values(data).returning();
@@ -992,8 +993,8 @@ export async function updateOrganization(id: string, formData: FormData) {
     name: formData.get("name") as string,
     alternativeNames,
     orgType: formData.get("orgType") as string || null,
-    description: formData.get("description") as string || null,
-    notes: formData.get("notes") as string || null,
+    description: sanitizeHtml(formData.get("description") as string),
+    notes: sanitizeHtml(formData.get("notes") as string),
     updatedAt: new Date(),
   };
 
@@ -1024,7 +1025,7 @@ export async function createAddress(formData: FormData) {
     fullAddress: formData.get("fullAddress") as string || null,
     latitude: parseCoord(formData.get("latitude") as string),
     longitude: parseCoord(formData.get("longitude") as string),
-    notes: formData.get("notes") as string || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
   };
 
   const [newAddress] = await db.insert(addresses).values(data).returning();
@@ -1043,7 +1044,7 @@ export async function updateAddress(id: string, formData: FormData) {
     fullAddress: formData.get("fullAddress") as string || null,
     latitude: parseCoord(formData.get("latitude") as string),
     longitude: parseCoord(formData.get("longitude") as string),
-    notes: formData.get("notes") as string || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
     updatedAt: new Date(),
   };
 
@@ -1077,7 +1078,7 @@ export async function createAddressAndLinkToLocation(locationId: string, formDat
     fullAddress: formData.get("fullAddress") as string || null,
     latitude: parseCoord(formData.get("latitude") as string),
     longitude: parseCoord(formData.get("longitude") as string),
-    notes: formData.get("notes") as string || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
   }).returning();
 
   // If setting as primary, unset existing primary for this location
@@ -1306,7 +1307,7 @@ export async function updateAddressAndLink(addressId: string, linkId: string, lo
     fullAddress: formData.get("fullAddress") as string || null,
     latitude: parseCoord(formData.get("latitude") as string),
     longitude: parseCoord(formData.get("longitude") as string),
-    notes: formData.get("notes") as string || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
     updatedAt: new Date(),
   };
 
@@ -2035,7 +2036,7 @@ export async function createTranscript(formData: FormData): Promise<{ error: str
     publicationStatus: (formData.get("publicationStatus") as string) || "draft",
     stage: (formData.get("stage") as string) || "editor_review",
     createdBy: (formData.get("createdBy") as string) || currentUserId,
-    notes: (formData.get("notes") as string) || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
   };
 
   // editedBy for revision - use provided value, current user ID, or username as fallback
@@ -2138,7 +2139,7 @@ export async function updateTranscript(id: string, formData: FormData) {
     publicationStatus: formData.get("publicationStatus") as string,
     version: newVersion,
     editedBy,
-    notes: (formData.get("notes") as string) || null,
+    notes: sanitizeHtml(formData.get("notes") as string),
     updatedAt: new Date(),
   };
 

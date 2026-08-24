@@ -661,7 +661,10 @@ export default async function EventDetailPage({
             {event.eventDescription && (
               <div className="mt-4">
                 <dt className="text-sm font-medium text-muted-foreground">Description</dt>
-                <dd className="text-sm mt-1">{event.eventDescription}</dd>
+                <dd
+                  className="text-sm mt-1 whitespace-pre-line [&_a]:text-blue-600 [&_a]:underline"
+                  dangerouslySetInnerHTML={{ __html: event.eventDescription }}
+                />
               </div>
             )}
           </div>

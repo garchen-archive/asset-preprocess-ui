@@ -299,7 +299,7 @@ export default function StorageImportPage() {
                   <input
                     type="file"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    accept=".mp4,.mov,.mp3,.wav,.m4a,.mkv,.avi,.aac,.ogg"
+                    accept=".mp4,.mov,.mp3,.wav,.m4a,.mkv,.avi,.aac,.ogg,.pdf"
                     className="hidden"
                     id="file-upload"
                   />
@@ -319,7 +319,7 @@ export default function StorageImportPage() {
                         <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                         <p className="mt-2">Drop a file here or click to browse</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Supports: .mp4, .mov, .mp3, .wav, .m4a, .mkv, .avi, .aac, .ogg
+                          Supports: .mp4, .mov, .mp3, .wav, .m4a, .mkv, .avi, .aac, .ogg, .pdf
                         </p>
                       </div>
                     )}
