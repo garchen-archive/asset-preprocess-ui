@@ -207,7 +207,7 @@ export default async function AssetDetailPage({
               {(data.metadataSource === 'backblaze' || data.metadataSource === 'pipeline') && data.filepath && (
                 <BackblazeLink fileKey={data.filepath} variant="icon" />
               )}
-              {data.mediaProvider === "mux" && data.mediaProviderAssetId && (
+              {muxData?.assetId && (
                 <span
                   title="Available on Mux"
                   className="text-pink-600"
@@ -268,10 +268,10 @@ export default async function AssetDetailPage({
 
           {/* Mux Integration Section - Show for video/audio assets */}
           {!isDeleted && (data.assetType === "video" || data.assetType === "audio") && (() => {
-            // Use muxData from external ref (preferred) or fall back to additionalMetadata
-            const playbackId = muxData?.playbackId || (data.additionalMetadata?.media_provider as { playback_id?: string })?.playback_id;
-            const muxAssetId = muxData?.assetId || data.mediaProviderAssetId;
-            const muxStatus = muxData?.status || (data.additionalMetadata?.media_provider as { status?: string })?.status;
+            // Use muxData from external ref only
+            const playbackId = muxData?.playbackId;
+            const muxAssetId = muxData?.assetId;
+            const muxStatus = muxData?.status;
             const isReady = muxStatus === "ready";
             const isMuxSynced = !!muxData;
 
@@ -289,12 +289,12 @@ export default async function AssetDetailPage({
               <AssetMuxIntegration
                 assetId={params.id}
                 assetType={data.assetType}
-                mediaProvider={muxData ? "mux" : data.mediaProvider}
+                mediaProvider={muxData ? "mux" : null}
                 mediaProviderAssetId={muxAssetId}
                 playbackId={playbackId}
                 status={muxStatus}
-                duration={muxData?.duration || (data.additionalMetadata?.media_provider as { duration?: number })?.duration}
-                aspectRatio={muxData?.aspectRatio || (data.additionalMetadata?.media_provider as { aspect_ratio?: string })?.aspect_ratio}
+                duration={muxData?.duration}
+                aspectRatio={muxData?.aspectRatio}
                 muxDashboardUrl={muxAssetId ? getMuxDashboardUrl(muxAssetId) : null}
                 transcripts={linkedTranscripts.map(tr => ({
                   id: tr.id,
