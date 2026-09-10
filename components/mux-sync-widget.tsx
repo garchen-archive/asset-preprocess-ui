@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
+import { AssetRenditions } from "./asset-renditions";
 
 interface MuxTrack {
   track_id: string;
@@ -434,6 +435,17 @@ export function MuxSyncWidget({
                 </p>
               )}
             </div>
+          )}
+
+          {/* Static Renditions (MP4/Audio Downloads) */}
+          {mediaProviderAssetId && playbackId && (
+            <AssetRenditions
+              assetId={assetId}
+              muxAssetId={mediaProviderAssetId}
+              playbackId={playbackId}
+              isReady={isReady}
+              onRefresh={handleSyncComplete}
+            />
           )}
         </div>
       )}
